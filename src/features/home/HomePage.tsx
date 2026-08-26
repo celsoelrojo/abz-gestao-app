@@ -14,15 +14,32 @@ const MIGRATED_MODULES = [
   // Igual ao protótipo (MODULE_ACCESS.reservas): só Administrador e o setor
   // Salão (Gestor ou Atendente) — Bar/Cozinha nunca acessam este módulo.
   { key: 'reservas', to: '/reservas', title: 'Reservas', desc: 'Agenda do salão', roles: 'salao' as const },
+  // Bar/Cozinha só (nunca Salão) — igual ao protótipo (getVinculoOptions só
+  // busca fichas nesses dois setores).
+  {
+    key: 'fichas-tecnicas',
+    to: '/fichas-tecnicas',
+    title: 'Fichas Técnicas',
+    desc: 'Receitas, custos e modo de preparo',
+    roles: 'bar_cozinha' as const,
+  },
+  {
+    key: 'fichas-producao',
+    to: '/fichas-producao',
+    title: 'Fichas de Produção',
+    desc: 'Produção em lote, validade e etiquetas',
+    roles: 'bar_cozinha' as const,
+  },
 ]
 
-const PENDING_MODULES = ['Mapas e Fluxogramas', "POP's", 'Fichas Técnicas', 'Fichas de Produção', 'Freelancer']
+const PENDING_MODULES = ['Mapas e Fluxogramas', "POP's", 'Freelancer']
 
 export function HomePage() {
   const profile = useAuthStore((s) => s.profile)
   const isAdmin = profile?.role === 'administrador'
   const managerAccess = isManager(profile)
   const salaoAccess = isAdmin || profile?.setor === 'Salão'
+  const barCozinhaAccess = isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha'
 
   return (
     <div className="container">
@@ -35,7 +52,8 @@ export function HomePage() {
             m.roles === 'todos' ||
             (m.roles === 'admin' && isAdmin) ||
             (m.roles === 'manager' && managerAccess) ||
-            (m.roles === 'salao' && salaoAccess),
+            (m.roles === 'salao' && salaoAccess) ||
+            (m.roles === 'bar_cozinha' && barCozinhaAccess),
         ).map((m) => (
           <Link className="module-btn" to={m.to} key={m.key}>
             <span className="module-title">{m.title}</span>

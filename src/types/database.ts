@@ -132,18 +132,176 @@ export type PopRow = {
   status: 'rascunho' | 'publicada' | 'inativa'
 }
 
+export type FichaStatus = 'rascunho' | 'publicada' | 'inativa'
+
+export type FichaIngredienteTecnica = {
+  id: string
+  nome: string
+  unidade: string
+  qtdBruta: number | null
+  qtdLiquida: number | null
+  fatorCorrecao: number | null
+  qtdBase: number | null
+  precoBase: number | null
+}
+
+export type FichaEtapa = {
+  id: string
+  titulo: string
+  descricao: string
+  imagens: string[]
+}
+
+export type FichaVinculoTipo = 'Mapa' | 'POP' | 'Ficha Técnica'
+
+export type FichaVinculo = {
+  tipo: FichaVinculoTipo
+  id: string
+}
+
 export type FichaTecnicaRow = {
   id: string
   nome: string
   setor: string
-  status: 'rascunho' | 'publicada' | 'inativa'
+  codigo: string | null
+  categoria: string | null
+  subcategoria: string | null
+  foto_principal_url: string | null
+  ingredientes: FichaIngredienteTecnica[]
+  embalagem: number | null
+  preco_sugerido: number | null
+  etapas: FichaEtapa[]
+  utensilios: string | null
+  equipamentos: string | null
+  padrao_apresentacao: string | null
+  boas_praticas: string | null
+  epis: string | null
+  tempo_preparo: string | null
+  alergenicos: string | null
+  info_nutricional: string | null
+  observacoes_gerais: string | null
+  padrao_qualidade: string | null
+  criterios_reprovacao: string | null
+  vinculos: FichaVinculo[]
+  criado_por: string | null
+  criado_em: string
+  ultima_revisao_em: string | null
+  publicado_por: string | null
+  publicado_em: string | null
+  versao: number
+  status: FichaStatus
+  created_at: string
+  updated_at: string
 }
+
+// Mesma forma da tabela base, sem embalagem/preco_sugerido e sem
+// qtdBase/precoBase dentro de cada ingrediente — o que a view
+// fichas_tecnicas_sem_custo devolve.
+export type FichaTecnicaSemCustoRow = Omit<FichaTecnicaRow, 'embalagem' | 'preco_sugerido' | 'ingredientes'> & {
+  ingredientes: Omit<FichaIngredienteTecnica, 'qtdBase' | 'precoBase'>[]
+}
+
+export type ProducaoIngredienteTipo = 'base' | 'secundario' | 'variavel'
+
+export type ProducaoIngrediente = {
+  id: string
+  nome: string
+  unidade: string
+  qtdLotePadrao: number | null
+  qtdAjustada: number | null
+  perdas: string | null
+  observacoes: string | null
+  substituicoes: string | null
+  estoqueItemId: string | null
+  tipo: ProducaoIngredienteTipo
+  custoUnitario: number | null
+}
+
+export type ProducaoEtapa = {
+  id: string
+  titulo: string
+  descricao: string
+  tempo: string | null
+  temperatura: string | null
+  equipamento: string | null
+  utensilios: string | null
+  pontoControle: string | null
+  imagens: string[]
+}
+
+export type FichaProducaoHistoricoTipo = 'criacao' | 'revisao' | 'publicacao'
+
+export type FichaProducaoHistoricoEntry = {
+  data: string
+  tipo: FichaProducaoHistoricoTipo
+  autor: string
+}
+
+export type UnidadeValidade = 'Horas' | 'Dias' | 'Semanas' | 'Meses'
 
 export type FichaProducaoRow = {
   id: string
   nome: string
   setor: string
-  status: 'rascunho' | 'publicada' | 'inativa'
+  codigo: string | null
+  categoria: string | null
+  foto_principal_url: string | null
+  fichas_tecnicas_vinculadas: string[]
+  ingredientes: ProducaoIngrediente[]
+  etapas: ProducaoEtapa[]
+  prazo_validade: number | null
+  unidade_validade: UnidadeValidade | null
+  condicao_armazenamento: string | null
+  temp_min: number | null
+  temp_max: number | null
+  tipo_recipiente: string | null
+  qtd_recipientes: string | null
+  validade_apos_aberto: string | null
+  validade_apos_descongelamento: string | null
+  instrucoes_etiqueta: string | null
+  instrucoes_descarte: string | null
+  qtd_lote_padrao: number | null
+  unidade_rendimento: string | null
+  qtd_porcoes_unidades: number | null
+  tempo_pre_preparo: string | null
+  tempo_preparo: string | null
+  tempo_descanso: string | null
+  tempo_resfriamento: string | null
+  tempo_total: string | null
+  pode_ser_fracionada: boolean
+  higienizacao: string | null
+  epis: string | null
+  cuidados_manipulacao: string | null
+  padrao_esperado: string | null
+  criterios_aprovacao: string | null
+  acoes_corretivas: string | null
+  alergenicos: string | null
+  observacoes_gerais: string | null
+  vinculos: FichaVinculo[]
+  historico: FichaProducaoHistoricoEntry[]
+  status: FichaStatus
+  versao: number
+  criado_por: string | null
+  criado_em: string
+  ultima_revisao_em: string | null
+  publicado_por: string | null
+  publicado_em: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type FichaProducaoLoteRow = {
+  id: string
+  ficha_id: string
+  numero_lote: string
+  data_hora_producao: string
+  responsavel: string
+  quantidade_produzida: string
+  data_hora_validade: string | null
+  justificativa_alteracao: string | null
+  observacao: string | null
+  foto_url: string | null
+  created_at: string
 }
 
 export type EstoqueCategoria = 'Bar' | 'Cozinha' | 'Salão' | 'Material de Limpeza' | 'Outros'
@@ -309,6 +467,7 @@ export type Database = {
       pops: TableDef<PopRow>
       fichas_tecnicas: TableDef<FichaTecnicaRow>
       fichas_producao: TableDef<FichaProducaoRow>
+      fichas_producao_lotes: TableDef<FichaProducaoLoteRow>
       estoque_itens: TableDef<EstoqueItemRow>
       estoque_movimentos: TableDef<EstoqueMovimentoRow>
       taxonomias: TableDef<TaxonomiaRow>
@@ -319,6 +478,7 @@ export type Database = {
     }
     Views: {
       reservas_sem_contato: ViewDef<ReservaSemContatoRow>
+      fichas_tecnicas_sem_custo: ViewDef<FichaTecnicaSemCustoRow>
     }
     Functions: {
       email_for_username: { Args: { p_username: string }; Returns: string }
@@ -351,6 +511,14 @@ export type Database = {
       reservas_hoje_resumo: {
         Args: Record<string, never>
         Returns: { periodo: ReservaPeriodo; total_pessoas: number }[]
+      }
+      registrar_producao_checklist: {
+        Args: { p_producao_id: string; p_quantidade: number; p_unidade: EstoqueUnidade }
+        Returns: { lote_id: string; movimento_id: string }[]
+      }
+      reverter_producao_checklist: {
+        Args: { p_lote_id: string | null; p_movimento_id: string }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>

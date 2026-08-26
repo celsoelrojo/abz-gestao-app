@@ -1,13 +1,17 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
 import { formatDateBR, formatWeekdayLong, isoDate, weekdayNameForDate } from '../../lib/date'
+import { supabase } from '../../lib/supabaseClient'
+import { toPrinterConfig } from '../../lib/printing/mappers'
+import { enqueuePrintJob } from '../../lib/printing/printQueue'
+import { ESTOQUE_UNIDADES_ENTRADA } from '../estoque/estoqueConstants'
 import { findOverdueInfo, getUpcomingDays, getWeekDates, isTaskScheduledOn } from './scheduling'
 import { useChecklistConclusoesRange, useChecklistRealtime, useChecklistTasks } from './useChecklistTasks'
 import { checklistFotoUrl, completeTask, resolveJustificativaAtraso, uncompleteTask } from './completeTask'
 import type { CompleteTaskOptions } from './completeTask'
 import { ManageChecklistModal } from './ManageChecklistModal'
-import type { ChecklistConclusaoRow, ChecklistTaskRow, Setor } from '../../types/database'
+import type { ChecklistConclusaoRow, ChecklistTaskRow, EstoqueUnidade, Setor } from '../../types/database'
 
 const SETORES: Setor[] = ['Bar', 'Cozinha', 'Salão']
 
@@ -41,6 +45,11 @@ export function ChecklistPage() {
     null,
   )
   const [pendingPhoto, setPendingPhoto] = useState<{
+    task: ChecklistTaskRow
+    dateIso: string
+    extra: CompleteTaskOptions
+  } | null>(null)
+  const [pendingProducao, setPendingProducao] = useState<{
     task: ChecklistTaskRow
     dateIso: string
     extra: CompleteTaskOptions
@@ -132,6 +141,14 @@ export function ChecklistPage() {
   }
 
   async function proceedToComplete(task: ChecklistTaskRow, dateIso: string, extra: CompleteTaskOptions) {
+    // envolve_producao e foto_obrigatoria são mutuamente exclusivos (ver
+    // ManageChecklistModal) — por isso a ordem entre os dois checks abaixo
+    // não importa na prática, mas produção vem primeiro por ser o fluxo mais
+    // específico.
+    if (task.envolve_producao && !extra.producao) {
+      setPendingProducao({ task, dateIso, extra })
+      return
+    }
     if (task.foto_obrigatoria && !extra.photoFile) {
       setPendingPhoto({ task, dateIso, extra })
       fileInputRef.current?.click()
@@ -140,11 +157,48 @@ export function ChecklistPage() {
     if (!profile) return
     setBusyKey(keyFor(task.id, dateIso))
     try {
-      await completeTask(task, dateIso, profile.id, extra)
+      const result = await completeTask(task, dateIso, profile.id, extra)
       await refetchConclusoes()
+      if (result.loteId) await offerLabelPrint(task, result.loteId)
     } finally {
       setBusyKey(null)
     }
+  }
+
+  // Etiqueta é opcional e só oferecida se houver impressora ativa cadastrada
+  // — sem isso, a produção continua registrada normalmente, só sem etiqueta.
+  async function offerLabelPrint(task: ChecklistTaskRow, loteId: string) {
+    if (!profile || !task.producao_vinculada_id) return
+    const [{ data: printers }, { data: producao }, { data: lote }] = await Promise.all([
+      supabase.from('printers').select('*').eq('ativa', true).order('nome').limit(1),
+      supabase.from('fichas_producao').select('nome, condicao_armazenamento').eq('id', task.producao_vinculada_id).maybeSingle(),
+      supabase.from('fichas_producao_lotes').select('*').eq('id', loteId).maybeSingle(),
+    ])
+    const printer = printers?.[0]
+    if (!printer || !producao || !lote) return
+    if (!window.confirm(`Adicionar etiqueta de "${producao.nome}" (lote ${lote.numero_lote}) à fila de impressão?`)) return
+    await enqueuePrintJob({
+      printer: toPrinterConfig(printer),
+      lote_id: loteId,
+      quantidade_etiquetas: 1,
+      data: {
+        produto: producao.nome,
+        preparo: new Date(lote.data_hora_producao).toLocaleString('pt-BR'),
+        validade: lote.data_hora_validade ? new Date(lote.data_hora_validade).toLocaleString('pt-BR') : '—',
+        armazenar: producao.condicao_armazenamento ?? '—',
+        responsavel: lote.responsavel,
+        quantidade: lote.quantidade_produzida,
+      },
+      responsavel_id: profile.id,
+      responsavel_nome: profile.nome,
+    })
+  }
+
+  function handleProducaoConfirm(quantidade: number, unidade: EstoqueUnidade) {
+    if (!pendingProducao) return
+    const { task, dateIso, extra } = pendingProducao
+    setPendingProducao(null)
+    proceedToComplete(task, dateIso, { ...extra, producao: { quantidade, unidade } })
   }
 
   async function handleToggle(task: ChecklistTaskRow, dateIso: string) {
@@ -382,6 +436,14 @@ export function ChecklistPage() {
         />
       )}
 
+      {pendingProducao && (
+        <ProducaoModal
+          taskTitle={pendingProducao.task.title}
+          onCancel={() => setPendingProducao(null)}
+          onConfirm={handleProducaoConfirm}
+        />
+      )}
+
       {manageOpen && <ManageChecklistModal onClose={() => setManageOpen(false)} />}
     </div>
   )
@@ -477,6 +539,69 @@ function JustificativaModal({
   )
 }
 
+function ProducaoModal({
+  taskTitle,
+  onCancel,
+  onConfirm,
+}: {
+  taskTitle: string
+  onCancel: () => void
+  onConfirm: (quantidade: number, unidade: EstoqueUnidade) => void
+}) {
+  const [quantidade, setQuantidade] = useState('')
+  const [unidade, setUnidade] = useState<EstoqueUnidade>('Quilo')
+  const quantidadeNum = Number(quantidade)
+  const isValid = quantidadeNum > 0
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!isValid) return
+    onConfirm(quantidadeNum, unidade)
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <div className="modal-header">
+          <h3>Registrar produção</h3>
+          <button className="modal-close" onClick={onCancel}>
+            ✕
+          </button>
+        </div>
+        <form className="modal-body" onSubmit={handleSubmit}>
+          <p>
+            Concluir "{taskTitle}" gera um lote e dá entrada automática no Estoque. Informe a quantidade produzida.
+          </p>
+          <div className="field-row">
+            <div className="field">
+              <label>Quantidade *</label>
+              <input type="number" min="0.001" step="any" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required />
+            </div>
+            <div className="field">
+              <label>Unidade *</label>
+              <select value={unidade} onChange={(e) => setUnidade(e.target.value as EstoqueUnidade)}>
+                {ESTOQUE_UNIDADES_ENTRADA.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-ghost" onClick={onCancel}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={!isValid}>
+              Confirmar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function TaskRow({
   task,
   dateIso,
@@ -524,6 +649,7 @@ function TaskRow({
           )}
           {showSetorBadge && <span className="task-setor-badge">{task.setor}</span>}
           {task.foto_obrigatoria && <span className="badge-foto">Foto obrigatória</span>}
+          {task.envolve_producao && <span className="badge-foto">Gera produção</span>}
         </div>
         {overdueDaysLate != null && (
           <div className="task-overdue-meta">
@@ -539,14 +665,16 @@ function TaskRow({
             ✓ Concluída às{' '}
             {new Date(conclusao.completed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             {conclusao.foto_url && (
-              <a
+              <button
+                type="button"
                 className="photo-view-link"
-                href={checklistFotoUrl(conclusao.foto_url)}
-                target="_blank"
-                rel="noreferrer"
+                onClick={async () => {
+                  const url = await checklistFotoUrl(conclusao.foto_url!)
+                  window.open(url, '_blank', 'noreferrer')
+                }}
               >
                 Ver foto
-              </a>
+              </button>
             )}
           </div>
         )}

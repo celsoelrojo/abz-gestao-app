@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabaseClient'
 import { toggleSemanaDoMes, toggleValue } from './taskFormHelpers'
@@ -194,6 +194,24 @@ function TaskFormModal({
   const [vinculoId, setVinculoId] = useState(task?.vinculo_id ?? '')
   const vinculoOptions = useVinculoOptions(vinculoTipo || null, setor)
 
+  // Mutuamente exclusivo com foto obrigatória: uma tarefa que envolve
+  // produção nunca também pede foto (o registro do lote já é a evidência).
+  const [envolveProducao, setEnvolveProducao] = useState(task?.envolve_producao ?? false)
+  const [producaoVinculadaId, setProducaoVinculadaId] = useState(task?.producao_vinculada_id ?? '')
+  const { data: producoesDoSetor } = useQuery({
+    queryKey: ['fichas_producao_publicadas', setor],
+    enabled: envolveProducao,
+    queryFn: async () => {
+      const { data, error: qError } = await supabase
+        .from('fichas_producao')
+        .select('id, nome')
+        .eq('status', 'publicada')
+        .eq('setor', setor)
+      if (qError) throw qError
+      return data as { id: string; nome: string }[]
+    },
+  })
+
   // Diferente do rascunho anterior: TODA periodicidade exceto Única pede os
   // dias da semana (inclusive Diária/"A cada turno" — o protótipo sempre
   // mostrou esse campo pra qualquer periodicidade selecionada, ver
@@ -207,7 +225,8 @@ function TaskFormModal({
     !!responsavelNome.trim() &&
     (periodicidade !== 'Única' || !!dataUnica) &&
     (!needsDiasPicker || dias.length > 0) &&
-    (!needsSemanaMes || semanasDoMes.length === semanaMesMax)
+    (!needsSemanaMes || semanasDoMes.length === semanaMesMax) &&
+    (!envolveProducao || !!producaoVinculadaId)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -215,10 +234,6 @@ function TaskFormModal({
     setError(null)
     setSubmitting(true)
     try {
-      // envolve_producao/producao_vinculada_id ficam de fora de propósito: é
-      // o gatilho do fluxo de registrar produção + baixa de estoque, que
-      // depende de Fichas de Produção terem tela própria aqui (ver nota no
-      // formulário). O vínculo genérico (Mapa/POP/Ficha) já é real.
       const payload = {
         setor,
         title: title.trim(),
@@ -230,7 +245,9 @@ function TaskFormModal({
         semanas_do_mes: needsSemanaMes ? semanasDoMes : [],
         vinculo_tipo: vinculoTipo || null,
         vinculo_id: vinculoTipo && vinculoId ? vinculoId : null,
-        foto_obrigatoria: fotoObrigatoria,
+        envolve_producao: envolveProducao,
+        producao_vinculada_id: envolveProducao ? producaoVinculadaId : null,
+        foto_obrigatoria: envolveProducao ? false : fotoObrigatoria,
         active,
       }
       const { error: saveError } = task
@@ -264,6 +281,7 @@ function TaskFormModal({
                 onChange={(e) => {
                   setSetor(e.target.value as Setor)
                   setVinculoId('')
+                  setProducaoVinculadaId('')
                 }}
                 disabled={!!lockedSetor}
               >
@@ -388,7 +406,12 @@ function TaskFormModal({
 
           <div className="field-row">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" checked={fotoObrigatoria} onChange={(e) => setFotoObrigatoria(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={fotoObrigatoria}
+                disabled={envolveProducao}
+                onChange={(e) => setFotoObrigatoria(e.target.checked)}
+              />
               Foto obrigatória ao concluir
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -397,10 +420,35 @@ function TaskFormModal({
             </label>
           </div>
 
-          <p className="field-hint">
-            A opção "esta tarefa envolve produção" (baixa automática de estoque + geração de lote ao concluir) ainda
-            não está disponível aqui — depende de Fichas de Produção terem tela própria nesta app.
-          </p>
+          <div>
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={envolveProducao}
+                onChange={(e) => {
+                  setEnvolveProducao(e.target.checked)
+                  if (e.target.checked) setFotoObrigatoria(false)
+                  else setProducaoVinculadaId('')
+                }}
+              />
+              Esta tarefa envolve produção (gera lote + entrada automática no Estoque ao concluir)
+            </label>
+            {envolveProducao && (
+              <div className="field" style={{ marginTop: 8 }}>
+                <select value={producaoVinculadaId} onChange={(e) => setProducaoVinculadaId(e.target.value)}>
+                  <option value="">Selecione a ficha de produção...</option>
+                  {producoesDoSetor?.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}
+                    </option>
+                  ))}
+                </select>
+                {producoesDoSetor?.length === 0 && (
+                  <span className="field-hint">Nenhuma ficha de produção publicada em {setor} ainda.</span>
+                )}
+              </div>
+            )}
+          </div>
 
           {error && <p className="login-error">{error}</p>}
 

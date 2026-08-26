@@ -9,6 +9,8 @@ import { ContasPage } from './features/contas/ContasPage'
 import { PrinterConfigPage } from './features/printing/PrinterConfigPage'
 import { EstoquePage } from './features/estoque/EstoquePage'
 import { ReservasPage } from './features/reservas/ReservasPage'
+import { FichasTecnicasPage } from './features/fichas/FichasTecnicasPage'
+import { FichasProducaoPage } from './features/fichas/FichasProducaoPage'
 import { HomePage } from './features/home/HomePage'
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -75,6 +77,34 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shell>{isAdmin || profile?.setor === 'Salão' ? <ReservasPage /> : <Navigate to="/" replace />}</Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/fichas-tecnicas"
+        element={
+          <ProtectedRoute>
+            <Shell>
+              {isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha' ? (
+                <FichasTecnicasPage />
+              ) : (
+                <Navigate to="/" replace />
+              )}
+            </Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/fichas-producao"
+        element={
+          <ProtectedRoute>
+            <Shell>
+              {isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha' ? (
+                <FichasProducaoPage />
+              ) : (
+                <Navigate to="/" replace />
+              )}
+            </Shell>
           </ProtectedRoute>
         }
       />

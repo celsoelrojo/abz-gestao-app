@@ -198,6 +198,87 @@ export type TaxonomiaRow = {
   valor: string
 }
 
+export type MensagemDestino = 'Bar' | 'Cozinha' | 'Salão' | 'Todos'
+
+export type MensagemRow = {
+  id: string
+  content: string
+  destino: MensagemDestino
+  author_id: string
+  author_nome: string
+  created_at: string
+}
+
+export type ReservaStatus =
+  | 'pendente'
+  | 'confirmada'
+  | 'cancelada'
+  | 'cliente_chegou'
+  | 'em_atendimento'
+  | 'concluida'
+  | 'nao_compareceu'
+export type ReservaPeriodo = 'Almoço' | 'Noite'
+
+export type ReservaHistoricoEntry = {
+  data: string
+  tipo: 'criacao' | 'confirmacao' | 'cancelamento' | 'mudanca_mesa'
+  autor: string
+  detalhe?: string | null
+}
+
+export type ReservaRow = {
+  id: string
+  nome_cliente: string
+  telefone: string | null
+  email: string | null
+  instagram: string | null
+  origem: string | null
+  data: string
+  horario: string | null
+  periodo: ReservaPeriodo
+  quantidade_pessoas: number
+  mesa: string | null
+  ocasiao: string | null
+  observacoes: string | null
+  restricoes: string | null
+  responsavel: string | null
+  status: ReservaStatus
+  sinal: string | null
+  criado_por: string | null
+  motivo_cancelamento: string | null
+  cancelada_por: string | null
+  cancelada_em: string | null
+  historico: ReservaHistoricoEntry[]
+  created_at: string
+  updated_at: string
+}
+
+export type ReservaSemContatoRow = Omit<ReservaRow, 'telefone' | 'email' | 'instagram'>
+
+export type ReservaCapacidadeRow = {
+  periodo: ReservaPeriodo
+  capacidade: number
+}
+
+// Só os campos usados pelo resumo "Freelancers hoje" do painel de Mensagens
+// Importantes — o módulo Freelancer em si (CRUD completo) não tem tela
+// própria nesta app ainda.
+export type FreelancerEscalaRow = {
+  id: string
+  freelancer_id: string
+  data: string
+  setor: Setor
+  periodo: ReservaPeriodo
+  hora_inicio: string | null
+  hora_fim: string | null
+  valor_pagamento: number | null
+  funcao_turno: string | null
+  observacoes: string | null
+  tarefa_pagamento_id: number | null
+  created_at: string
+  updated_at: string
+}
+
 export type AuditLogRow = {
   id: number
   table_name: string
@@ -213,6 +294,7 @@ export type AuditLogRow = {
 }
 
 type TableDef<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] }
+type ViewDef<Row> = { Row: Row; Relationships: [] }
 
 export type Database = {
   public: {
@@ -230,8 +312,14 @@ export type Database = {
       estoque_itens: TableDef<EstoqueItemRow>
       estoque_movimentos: TableDef<EstoqueMovimentoRow>
       taxonomias: TableDef<TaxonomiaRow>
+      mensagens: TableDef<MensagemRow>
+      reservas: TableDef<ReservaRow>
+      reserva_capacidade: TableDef<ReservaCapacidadeRow>
+      freelancer_escalas: TableDef<FreelancerEscalaRow>
     }
-    Views: Record<string, never>
+    Views: {
+      reservas_sem_contato: ViewDef<ReservaSemContatoRow>
+    }
     Functions: {
       email_for_username: { Args: { p_username: string }; Returns: string }
       resolve_justificativa_atraso: { Args: { p_conclusao_id: string }; Returns: undefined }
@@ -260,6 +348,10 @@ export type Database = {
         Returns: EstoqueMovimentoRow
       }
       estornar_retirada_estoque: { Args: { p_movimento_id: string }; Returns: EstoqueMovimentoRow }
+      reservas_hoje_resumo: {
+        Args: Record<string, never>
+        Returns: { periodo: ReservaPeriodo; total_pessoas: number }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

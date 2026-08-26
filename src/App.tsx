@@ -8,6 +8,7 @@ import { ChecklistPage } from './features/checklist/ChecklistPage'
 import { ContasPage } from './features/contas/ContasPage'
 import { PrinterConfigPage } from './features/printing/PrinterConfigPage'
 import { EstoquePage } from './features/estoque/EstoquePage'
+import { ReservasPage } from './features/reservas/ReservasPage'
 import { HomePage } from './features/home/HomePage'
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -66,6 +67,14 @@ export default function App() {
             <Shell>
               <EstoquePage />
             </Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reservas"
+        element={
+          <ProtectedRoute>
+            <Shell>{isAdmin || profile?.setor === 'Salão' ? <ReservasPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />

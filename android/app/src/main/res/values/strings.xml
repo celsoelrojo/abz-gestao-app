@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Abz Gestao</string>
+    <string name="title_activity_main">Abz Gestao</string>
+    <string name="package_name">com.abrazodrinkbar.gestao</string>
+    <string name="custom_url_scheme">com.abrazodrinkbar.gestao</string>
+</resources>

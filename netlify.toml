@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+# SPA: qualquer rota (/checklist, /contas, /estoque...) precisa cair no
+# index.html pra o React Router assumir o roteamento no navegador — sem isso,
+# recarregar a página numa rota diferente de "/" dá 404 no Netlify.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

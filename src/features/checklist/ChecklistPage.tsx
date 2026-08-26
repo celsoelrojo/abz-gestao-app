@@ -1,0 +1,569 @@
+import { useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
+import { formatDateBR, formatWeekdayLong, isoDate, weekdayNameForDate } from '../../lib/date'
+import { findOverdueInfo, getUpcomingDays, getWeekDates, isTaskScheduledOn } from './scheduling'
+import { useChecklistConclusoesRange, useChecklistRealtime, useChecklistTasks } from './useChecklistTasks'
+import { checklistFotoUrl, completeTask, resolveJustificativaAtraso, uncompleteTask } from './completeTask'
+import type { CompleteTaskOptions } from './completeTask'
+import { ManageChecklistModal } from './ManageChecklistModal'
+import type { ChecklistConclusaoRow, ChecklistTaskRow, Setor } from '../../types/database'
+
+const SETORES: Setor[] = ['Bar', 'Cozinha', 'Salão']
+
+const today = new Date()
+const todayIso = isoDate(today)
+const week = getWeekDates(today)
+const weekStartIso = isoDate(week[0])
+const upcomingDays = getUpcomingDays(5, today)
+const upcomingEndIso = isoDate(upcomingDays[upcomingDays.length - 1])
+
+function keyFor(taskId: number, dateIso: string) {
+  return `${taskId}:${dateIso}`
+}
+
+export function ChecklistPage() {
+  const profile = useAuthStore((s) => s.profile)
+  const queryClient = useQueryClient()
+  const { data: tasks, isLoading: loadingTasks } = useChecklistTasks()
+  const { data: conclusoesRange, isLoading: loadingConclusoes } = useChecklistConclusoesRange(
+    weekStartIso,
+    upcomingEndIso,
+  )
+  useChecklistRealtime()
+
+  const [pendingAtraso, setPendingAtraso] = useState<{
+    task: ChecklistTaskRow
+    missedDate: string
+    daysLate: number
+  } | null>(null)
+  const [pendingAntecipacao, setPendingAntecipacao] = useState<{ task: ChecklistTaskRow; dateIso: string } | null>(
+    null,
+  )
+  const [pendingPhoto, setPendingPhoto] = useState<{
+    task: ChecklistTaskRow
+    dateIso: string
+    extra: CompleteTaskOptions
+  } | null>(null)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [manageOpen, setManageOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const visibleTasks = useMemo(() => (tasks ?? []).filter((t) => !t.freelancer_pagamento), [tasks])
+
+  const conclusaoByKey = useMemo(() => {
+    const map = new Map<string, ChecklistConclusaoRow>()
+    conclusoesRange?.forEach((c) => map.set(keyFor(c.task_id, c.data_referencia), c))
+    return map
+  }, [conclusoesRange])
+
+  const completedDatesByTask = useMemo(() => {
+    const map = new Map<number, string[]>()
+    conclusoesRange?.forEach((c) => {
+      const arr = map.get(c.task_id) ?? []
+      arr.push(c.data_referencia)
+      map.set(c.task_id, arr)
+    })
+    return map
+  }, [conclusoesRange])
+
+  const overdueByTaskId = useMemo(() => {
+    const map = new Map<number, { missedDate: string; daysLate: number }>()
+    visibleTasks.forEach((t) => {
+      const info = findOverdueInfo(t, week, today, completedDatesByTask.get(t.id) ?? [])
+      if (info) map.set(t.id, info)
+    })
+    return map
+  }, [visibleTasks, completedDatesByTask])
+
+  // Tarefas concluídas hoje com justificativa de atraso — ficam visíveis no
+  // painel "Tarefas Atrasadas" (só pra quem gerencia) até serem apagadas.
+  // Isso é independente de a tarefa estar programada pra hoje: uma tarefa
+  // Semanal (só segunda) concluída atrasada numa quinta não aparece em
+  // nenhum outro lugar, então precisa aparecer aqui.
+  const lateResolvedToday = useMemo(() => {
+    return (conclusoesRange ?? [])
+      .filter((c) => c.data_referencia === todayIso && c.justificativa_atraso)
+      .filter((c) => isFullAdmin(profile) || !c.justificativa_atraso_dismissed)
+      .map((c) => ({ conclusao: c, task: visibleTasks.find((t) => t.id === c.task_id) }))
+      .filter((e): e is { conclusao: ChecklistConclusaoRow; task: ChecklistTaskRow } => !!e.task)
+  }, [conclusoesRange, visibleTasks, profile])
+
+  const todayGroups = useMemo(() => {
+    const scheduledToday = visibleTasks.filter((t) => isTaskScheduledOn(t, today) && !overdueByTaskId.has(t.id))
+    const groups = new Map<string, ChecklistTaskRow[]>()
+    scheduledToday.forEach((t) => {
+      if (!groups.has(t.setor)) groups.set(t.setor, [])
+      groups.get(t.setor)!.push(t)
+    })
+    return [...groups.entries()]
+  }, [visibleTasks, overdueByTaskId])
+
+  // Administrador vê tarefas de todos os setores misturadas — sem sinalizar
+  // de qual setor é cada uma, fica ambíguo. Gestor de setor e perfis de
+  // setor só enxergam o próprio setor (RLS), então a separação não faz
+  // diferença pra eles e a lista fica simples (só por dia).
+  const showSetorBadges = isFullAdmin(profile)
+
+  function buildUpcomingDayGroups(tasksForSetor: ChecklistTaskRow[]) {
+    return upcomingDays
+      .map((date) => {
+        const dateIso = isoDate(date)
+        const dayTasks = tasksForSetor.filter((t) => isTaskScheduledOn(t, date))
+        return { date, dateIso, weekday: weekdayNameForDate(date), tasks: dayTasks }
+      })
+      .filter((g) => g.tasks.length > 0)
+  }
+
+  const upcomingGroups = useMemo(() => buildUpcomingDayGroups(visibleTasks), [visibleTasks])
+
+  const upcomingGroupsBySetor = useMemo(() => {
+    if (!showSetorBadges) return null
+    return SETORES.map((setor) => ({
+      setor,
+      days: buildUpcomingDayGroups(visibleTasks.filter((t) => t.setor === setor)),
+    })).filter((block) => block.days.length > 0)
+  }, [visibleTasks, showSetorBadges])
+
+  const canManage = isManager(profile, undefined)
+
+  async function refetchConclusoes() {
+    await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'checklist_conclusoes' })
+  }
+
+  async function proceedToComplete(task: ChecklistTaskRow, dateIso: string, extra: CompleteTaskOptions) {
+    if (task.foto_obrigatoria && !extra.photoFile) {
+      setPendingPhoto({ task, dateIso, extra })
+      fileInputRef.current?.click()
+      return
+    }
+    if (!profile) return
+    setBusyKey(keyFor(task.id, dateIso))
+    try {
+      await completeTask(task, dateIso, profile.id, extra)
+      await refetchConclusoes()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  async function handleToggle(task: ChecklistTaskRow, dateIso: string) {
+    if (!profile) return
+    const existing = conclusaoByKey.get(keyFor(task.id, dateIso))
+    if (existing) {
+      setBusyKey(keyFor(task.id, dateIso))
+      try {
+        await uncompleteTask(task.id, dateIso)
+        await refetchConclusoes()
+      } finally {
+        setBusyKey(null)
+      }
+      return
+    }
+    if (dateIso > todayIso) {
+      setPendingAntecipacao({ task, dateIso })
+      return
+    }
+    const overdue = dateIso === todayIso ? overdueByTaskId.get(task.id) : undefined
+    if (overdue) {
+      setPendingAtraso({ task, missedDate: overdue.missedDate, daysLate: overdue.daysLate })
+      return
+    }
+    await proceedToComplete(task, dateIso, {})
+  }
+
+  async function handlePhotoSelected(file: File | undefined) {
+    if (!file || !pendingPhoto || !profile) return
+    const { task, dateIso, extra } = pendingPhoto
+    setPendingPhoto(null)
+    setBusyKey(keyFor(task.id, dateIso))
+    try {
+      await completeTask(task, dateIso, profile.id, { ...extra, photoFile: file })
+      await refetchConclusoes()
+    } finally {
+      setBusyKey(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleDismissAtraso(conclusaoId: string) {
+    if (!window.confirm('Apagar a notificação de atraso? Esta ação não pode ser desfeita.')) return
+    await resolveJustificativaAtraso(conclusaoId)
+    await refetchConclusoes()
+  }
+
+  if (loadingTasks || loadingConclusoes) {
+    return <div className="soon-box">Carregando checklist…</div>
+  }
+
+  return (
+    <div className="container">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => handlePhotoSelected(e.target.files?.[0])}
+      />
+      <div className="checklist-header">
+        <div>
+          <h2 className="page-title">Checklist Diário</h2>
+          <p className="page-subtitle">Hoje · {weekdayNameForDate(today)}</p>
+        </div>
+        {canManage && (
+          <button className="btn btn-primary" onClick={() => setManageOpen(true)}>
+            ⚙ Gerenciar Checklist
+          </button>
+        )}
+      </div>
+
+      <div className="checklist-categories">
+        {(overdueByTaskId.size > 0 || lateResolvedToday.length > 0) && (
+          <section className="overdue-section">
+            <div className="overdue-section-header">
+              <h3 className="overdue-section-title">Tarefas Atrasadas</h3>
+            </div>
+            <div className="overdue-tasks-list">
+              {visibleTasks
+                .filter((t) => overdueByTaskId.has(t.id))
+                .map((t) => {
+                  const info = overdueByTaskId.get(t.id)!
+                  return (
+                    <TaskRow
+                      key={`overdue-${t.id}`}
+                      task={t}
+                      dateIso={todayIso}
+                      completed={false}
+                      overdueDaysLate={info.daysLate}
+                      busy={busyKey === keyFor(t.id, todayIso)}
+                      onToggle={() => handleToggle(t, todayIso)}
+                      showAntecipadaBadge={false}
+                      showSetorBadge={showSetorBadges}
+                    />
+                  )
+                })}
+              {lateResolvedToday.map(({ conclusao, task }) => (
+                <div className="task-row task-row-overdue" key={`late-${conclusao.id}`}>
+                  <button className="task-checkbox checked" disabled title="Concluída com atraso">
+                    ✓
+                  </button>
+                  <div className="task-main">
+                    <div className="task-title-row">
+                      <span className="task-title">{task.title}</span>
+                      <span className="task-overdue-badge">Atrasada</span>
+                      {showSetorBadges && <span className="task-setor-badge">{task.setor}</span>}
+                    </div>
+                    <div className="task-overdue-meta">
+                      Programada para {formatDateBR(conclusao.justificativa_atraso_missed_date)} ·{' '}
+                      {conclusao.justificativa_atraso_days_late}{' '}
+                      {conclusao.justificativa_atraso_days_late === 1 ? 'dia' : 'dias'} em atraso
+                    </div>
+                    <div className="task-justificativa-atraso">
+                      <strong>Justificativa de atraso:</strong> {conclusao.justificativa_atraso}
+                    </div>
+                  </div>
+                  <div className="task-actions">
+                    <button
+                      type="button"
+                      className="icon-btn danger"
+                      title="Apagar notificação"
+                      onClick={() => handleDismissAtraso(conclusao.id)}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="today-section">
+          {todayGroups.length === 0 && overdueByTaskId.size === 0 && lateResolvedToday.length === 0 && (
+            <div className="empty-state">Nenhuma tarefa programada para hoje.</div>
+          )}
+          {todayGroups.map(([setor, setorTasks]) => (
+            <div className="category-block" key={setor}>
+              <div className="category-header category-header-static">
+                <div className="category-header-left">
+                  <span className="category-title">{setor}</span>
+                  <span className="category-count">{setorTasks.length}</span>
+                </div>
+              </div>
+              <div className="category-body">
+                {setorTasks.map((task) => {
+                  const conclusao = conclusaoByKey.get(keyFor(task.id, todayIso))
+                  return (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      dateIso={todayIso}
+                      completed={!!conclusao}
+                      conclusao={conclusao}
+                      busy={busyKey === keyFor(task.id, todayIso)}
+                      onToggle={() => handleToggle(task, todayIso)}
+                      showAntecipadaBadge={canManage}
+                      isToday
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <section className="upcoming-section">
+          <h3 className="section-label">Próximos 5 dias</h3>
+          {upcomingGroupsBySetor ? (
+            <>
+              {upcomingGroupsBySetor.length === 0 && (
+                <div className="empty-state">Nenhuma tarefa programada para os próximos 5 dias.</div>
+              )}
+              {upcomingGroupsBySetor.map((block) => (
+                <div className="upcoming-setor-block" key={block.setor}>
+                  <h4 className="upcoming-setor-title">{block.setor}</h4>
+                  {block.days.map((g) => (
+                    <UpcomingDayGroup
+                      key={g.dateIso}
+                      group={g}
+                      conclusaoByKey={conclusaoByKey}
+                      busyKey={busyKey}
+                      canManage={canManage}
+                      onToggle={handleToggle}
+                    />
+                  ))}
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              {upcomingGroups.length === 0 && (
+                <div className="empty-state">Nenhuma tarefa programada para os próximos 5 dias.</div>
+              )}
+              {upcomingGroups.map((g) => (
+                <UpcomingDayGroup
+                  key={g.dateIso}
+                  group={g}
+                  conclusaoByKey={conclusaoByKey}
+                  busyKey={busyKey}
+                  canManage={canManage}
+                  onToggle={handleToggle}
+                />
+              ))}
+            </>
+          )}
+        </section>
+      </div>
+
+      {pendingAtraso && (
+        <JustificativaModal
+          title="Justificativa de atraso"
+          message={`"${pendingAtraso.task.title}" estava programada para ${formatDateBR(pendingAtraso.missedDate)} (${pendingAtraso.daysLate} ${pendingAtraso.daysLate === 1 ? 'dia' : 'dias'} em atraso). Explique o motivo para concluir.`}
+          onCancel={() => setPendingAtraso(null)}
+          onConfirm={(texto) => {
+            const { task, missedDate, daysLate } = pendingAtraso
+            setPendingAtraso(null)
+            proceedToComplete(task, todayIso, { justificativaAtraso: { texto, missedDate, daysLate } })
+          }}
+        />
+      )}
+
+      {pendingAntecipacao && (
+        <JustificativaModal
+          title="Conclusão antecipada"
+          message={`"${pendingAntecipacao.task.title}" está programada para ${formatDateBR(pendingAntecipacao.dateIso)} — uma data futura. Você está concluindo essa tarefa antecipadamente.`}
+          onCancel={() => setPendingAntecipacao(null)}
+          onConfirm={(texto) => {
+            const { task, dateIso } = pendingAntecipacao
+            setPendingAntecipacao(null)
+            proceedToComplete(task, dateIso, { antecipacao: { justificativa: texto } })
+          }}
+        />
+      )}
+
+      {manageOpen && <ManageChecklistModal onClose={() => setManageOpen(false)} />}
+    </div>
+  )
+}
+
+interface UpcomingDay {
+  date: Date
+  dateIso: string
+  weekday: string
+  tasks: ChecklistTaskRow[]
+}
+
+function UpcomingDayGroup({
+  group,
+  conclusaoByKey,
+  busyKey,
+  canManage,
+  onToggle,
+}: {
+  group: UpcomingDay
+  conclusaoByKey: Map<string, ChecklistConclusaoRow>
+  busyKey: string | null
+  canManage: boolean
+  onToggle: (task: ChecklistTaskRow, dateIso: string) => void
+}) {
+  return (
+    <div className="week-day-group">
+      <div className="week-day-header">{formatWeekdayLong(group.date, group.weekday)}</div>
+      <div className="week-day-tasks">
+        {group.tasks.map((task) => {
+          const conclusao = conclusaoByKey.get(keyFor(task.id, group.dateIso))
+          return (
+            <TaskRow
+              key={task.id}
+              task={task}
+              dateIso={group.dateIso}
+              completed={!!conclusao}
+              conclusao={conclusao}
+              busy={busyKey === keyFor(task.id, group.dateIso)}
+              onToggle={() => onToggle(task, group.dateIso)}
+              showAntecipadaBadge={canManage}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function JustificativaModal({
+  title,
+  message,
+  onCancel,
+  onConfirm,
+}: {
+  title: string
+  message: string
+  onCancel: () => void
+  onConfirm: (texto: string) => void
+}) {
+  const [texto, setTexto] = useState('')
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <div className="modal-header">
+          <h3>{title}</h3>
+          <button className="modal-close" onClick={onCancel}>
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">
+          <p>{message}</p>
+          <div className="field">
+            <label>Justificativa *</label>
+            <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={3} />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn-ghost" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!texto.trim()}
+            onClick={() => onConfirm(texto.trim())}
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TaskRow({
+  task,
+  dateIso,
+  completed,
+  conclusao,
+  overdueDaysLate,
+  busy,
+  onToggle,
+  showAntecipadaBadge,
+  showSetorBadge,
+  isToday,
+}: {
+  task: ChecklistTaskRow
+  dateIso: string
+  completed: boolean
+  conclusao?: ChecklistConclusaoRow
+  overdueDaysLate?: number
+  busy: boolean
+  onToggle: () => void
+  showAntecipadaBadge: boolean
+  showSetorBadge?: boolean
+  isToday?: boolean
+}) {
+  const rowClass =
+    overdueDaysLate != null
+      ? 'task-row task-row-overdue'
+      : `task-row ${isToday ? 'task-row-today' : ''} ${completed ? 'completed' : ''}`
+  return (
+    <div className={rowClass}>
+      <button
+        className={`task-checkbox ${completed ? 'checked' : ''}`}
+        disabled={busy}
+        onClick={onToggle}
+        title={completed ? 'Marcar como não concluída' : 'Marcar como concluída'}
+      >
+        {completed ? '✓' : ''}
+      </button>
+      <div className="task-main">
+        <div className="task-title-row">
+          <span className="task-title">{task.title}</span>
+          {overdueDaysLate != null ? (
+            <span className="task-overdue-badge">Atrasada</span>
+          ) : (
+            isToday && <span className="task-today-badge">Hoje</span>
+          )}
+          {showSetorBadge && <span className="task-setor-badge">{task.setor}</span>}
+          {task.foto_obrigatoria && <span className="badge-foto">Foto obrigatória</span>}
+        </div>
+        {overdueDaysLate != null && (
+          <div className="task-overdue-meta">
+            {overdueDaysLate} {overdueDaysLate === 1 ? 'dia' : 'dias'} em atraso
+          </div>
+        )}
+        {task.description && <div className="task-desc">{task.description}</div>}
+        <div className="task-meta">
+          <span>{task.responsavel_nome}</span>
+        </div>
+        {completed && conclusao && (
+          <div className="task-completion">
+            ✓ Concluída às{' '}
+            {new Date(conclusao.completed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            {conclusao.foto_url && (
+              <a
+                className="photo-view-link"
+                href={checklistFotoUrl(conclusao.foto_url)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver foto
+              </a>
+            )}
+          </div>
+        )}
+        {completed && conclusao?.justificativa_atraso && (
+          <div className="task-justificativa-atraso">
+            <strong>Justificativa de atraso:</strong> {conclusao.justificativa_atraso}
+          </div>
+        )}
+        {completed && showAntecipadaBadge && conclusao?.antecipacao_justificativa && (
+          <>
+            <div className="task-antecipada-badge">Realizada antecipadamente</div>
+            <div className="task-justificativa-atraso task-justificativa-antecipada">
+              <strong>Programada para {formatDateBR(dateIso)}:</strong> {conclusao.antecipacao_justificativa}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}

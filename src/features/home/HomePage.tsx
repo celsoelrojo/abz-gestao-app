@@ -1,17 +1,18 @@
 import { Link } from 'react-router-dom'
 import { useAuthStore, isManager } from '../../store/authStore'
+import { Icon, type IconName } from '../../components/Icon'
 import { MensagensImportantesPanel } from '../mensagens/MensagensImportantesPanel'
 
 // Migração incremental e honesta: só os módulos com equivalente real no
 // Supabase (Checklist, Contas, Impressão) ficam clicáveis aqui. O resto
 // segue existindo no protótipo (abz-gestao/) até ganhar sua migração —
 // nenhum módulo desaparece, só ainda não tem versão "de produção".
-const MIGRATED_MODULES = [
-  { key: 'checklist', to: '/checklist', title: 'Checklist', desc: 'Rotina diária do bar', roles: 'todos' as const },
-  { key: 'estoque', to: '/estoque', title: 'Estoque e Compras', desc: 'Saldo, entradas e retiradas', roles: 'todos' as const },
+const MIGRATED_MODULES: { key: string; to: string; title: string; desc: string; icon: IconName; roles: string }[] = [
+  { key: 'checklist', to: '/checklist', title: 'Checklist', desc: 'Rotina diária do bar', icon: 'checklist', roles: 'todos' },
+  { key: 'estoque', to: '/estoque', title: 'Estoque e Compras', desc: 'Saldo, entradas e retiradas', icon: 'estoque', roles: 'todos' },
   // Igual ao protótipo (MODULE_ACCESS.reservas): só Administrador e o setor
   // Salão (Gestor ou Atendente) — Bar/Cozinha nunca acessam este módulo.
-  { key: 'reservas', to: '/reservas', title: 'Reservas', desc: 'Agenda do salão', roles: 'salao' as const },
+  { key: 'reservas', to: '/reservas', title: 'Reservas', desc: 'Agenda do salão', icon: 'reservas', roles: 'salao' },
   // Bar/Cozinha só (nunca Salão) — igual ao protótipo (getVinculoOptions só
   // busca fichas nesses dois setores).
   {
@@ -19,23 +20,25 @@ const MIGRATED_MODULES = [
     to: '/fichas-tecnicas',
     title: 'Fichas Técnicas',
     desc: 'Receitas, custos e modo de preparo',
-    roles: 'bar_cozinha' as const,
+    icon: 'fichas-tecnicas',
+    roles: 'bar_cozinha',
   },
   {
     key: 'fichas-producao',
     to: '/fichas-producao',
     title: 'Fichas de Produção',
     desc: 'Produção em lote, validade e etiquetas',
-    roles: 'bar_cozinha' as const,
+    icon: 'fichas-producao',
+    roles: 'bar_cozinha',
   },
-  { key: 'pops', to: '/pops', title: "POP's", desc: 'Procedimentos Operacionais Padrão', roles: 'todos' as const },
-  { key: 'mapas', to: '/mapas', title: 'Mapas e Fluxogramas', desc: 'Layout do ambiente e fluxos de processo', roles: 'todos' as const },
+  { key: 'pops', to: '/pops', title: "POP's", desc: 'Procedimentos Operacionais Padrão', icon: 'pops', roles: 'todos' },
+  { key: 'mapas', to: '/mapas', title: 'Mapas e Fluxogramas', desc: 'Layout do ambiente e fluxos de processo', icon: 'mapas', roles: 'todos' },
   // Igual ao protótipo (MODULE_ACCESS.freelancer = ['administrador']) — o
   // único módulo restrito só ao Administrador, sem exceção pra Gestor.
-  { key: 'freelancer', to: '/freelancer', title: 'Freelancer', desc: 'Cadastro e escala de freelancers', roles: 'admin' as const },
-  { key: 'contas', to: '/contas', title: 'Gerenciar Contas', desc: 'Usuários e acessos', roles: 'admin' as const },
-  { key: 'impressao', to: '/impressao', title: 'Configuração de Impressora', desc: 'Etiquetas de produção', roles: 'manager' as const },
-  { key: 'auditoria', to: '/auditoria', title: 'Histórico de Auditoria', desc: 'Quem alterou o quê e quando', roles: 'admin' as const },
+  { key: 'freelancer', to: '/freelancer', title: 'Freelancer', desc: 'Cadastro e escala de freelancers', icon: 'freelancer', roles: 'admin' },
+  { key: 'contas', to: '/contas', title: 'Gerenciar Contas', desc: 'Usuários e acessos', icon: 'accounts', roles: 'admin' },
+  { key: 'impressao', to: '/impressao', title: 'Configuração de Impressora', desc: 'Etiquetas de produção', icon: 'gear', roles: 'manager' },
+  { key: 'auditoria', to: '/auditoria', title: 'Histórico de Auditoria', desc: 'Quem alterou o quê e quando', icon: 'auditoria', roles: 'admin' },
 ]
 
 const PENDING_MODULES: string[] = []
@@ -62,6 +65,7 @@ export function HomePage() {
             (m.roles === 'bar_cozinha' && barCozinhaAccess),
         ).map((m) => (
           <Link className="module-btn" to={m.to} key={m.key}>
+            <Icon name={m.icon} className="module-icon" />
             <span className="module-title">{m.title}</span>
             <span className="module-desc">{m.desc}</span>
           </Link>

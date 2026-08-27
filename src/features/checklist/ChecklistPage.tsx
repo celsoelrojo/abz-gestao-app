@@ -85,6 +85,25 @@ export function ChecklistPage() {
     return map
   }, [visibleTasks, completedDatesByTask])
 
+  // Seção exclusiva do Administrador — "Pagar freelancer" é sincronizada
+  // automaticamente pela Escala (trigger no banco) e nunca aparece nas listas
+  // por setor de ninguém, nem pode ser editada em "Gerenciar Checklist".
+  const freelancerPagamentoTasks = useMemo(
+    () =>
+      (tasks ?? [])
+        .filter((t) => t.freelancer_pagamento && t.active)
+        .sort((a, b) => (a.data_unica ?? '').localeCompare(b.data_unica ?? '')),
+    [tasks],
+  )
+  const overdueByFreelancerTaskId = useMemo(() => {
+    const map = new Map<number, { missedDate: string; daysLate: number }>()
+    freelancerPagamentoTasks.forEach((t) => {
+      const info = findOverdueInfo(t, week, today, completedDatesByTask.get(t.id) ?? [])
+      if (info) map.set(t.id, info)
+    })
+    return map
+  }, [freelancerPagamentoTasks, completedDatesByTask])
+
   // Tarefas concluídas hoje com justificativa de atraso — ficam visíveis no
   // painel "Tarefas Atrasadas" (só pra quem gerencia) até serem apagadas.
   // Isso é independente de a tarefa estar programada pra hoje: uma tarefa
@@ -218,7 +237,7 @@ export function ChecklistPage() {
       setPendingAntecipacao({ task, dateIso })
       return
     }
-    const overdue = dateIso === todayIso ? overdueByTaskId.get(task.id) : undefined
+    const overdue = dateIso === todayIso ? (overdueByTaskId.get(task.id) ?? overdueByFreelancerTaskId.get(task.id)) : undefined
     if (overdue) {
       setPendingAtraso({ task, missedDate: overdue.missedDate, daysLate: overdue.daysLate })
       return
@@ -273,6 +292,40 @@ export function ChecklistPage() {
       </div>
 
       <div className="checklist-categories">
+        {isFullAdmin(profile) && freelancerPagamentoTasks.length > 0 && (
+          <section className="overdue-section">
+            <div className="overdue-section-header">
+              <h3 className="overdue-section-title" style={{ color: 'var(--gold-bright)' }}>
+                Pagamento de Freelancers
+              </h3>
+            </div>
+            <div className="overdue-tasks-list">
+              {freelancerPagamentoTasks.map((t) => {
+                const overdue = overdueByFreelancerTaskId.get(t.id)
+                // Igual à seção "Tarefas Atrasadas": recuperar um atraso
+                // sempre conclui com data_referencia = hoje (a data original
+                // perdida fica só na justificativa).
+                const dateIso = overdue ? todayIso : (t.data_unica ?? todayIso)
+                const conclusao = conclusaoByKey.get(keyFor(t.id, dateIso))
+                return (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    dateIso={dateIso}
+                    completed={!!conclusao}
+                    conclusao={conclusao}
+                    overdueDaysLate={overdue?.daysLate}
+                    busy={busyKey === keyFor(t.id, dateIso)}
+                    onToggle={() => handleToggle(t, dateIso)}
+                    showAntecipadaBadge={false}
+                    isToday={dateIso === todayIso}
+                  />
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {(overdueByTaskId.size > 0 || lateResolvedToday.length > 0) && (
           <section className="overdue-section">
             <div className="overdue-section-header">

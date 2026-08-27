@@ -95,7 +95,7 @@ export function FichasProducaoPage() {
           <p className="page-subtitle">Consulte receitas de produção publicadas ou gerencie as fichas do seu setor</p>
         </div>
         {canManage && (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <button className={`btn ${modo === 'consultar' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setModo('consultar')}>
               Consultar
             </button>

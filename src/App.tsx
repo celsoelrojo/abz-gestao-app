@@ -11,6 +11,9 @@ import { EstoquePage } from './features/estoque/EstoquePage'
 import { ReservasPage } from './features/reservas/ReservasPage'
 import { FichasTecnicasPage } from './features/fichas/FichasTecnicasPage'
 import { FichasProducaoPage } from './features/fichas/FichasProducaoPage'
+import { MapasPage } from './features/mapas/MapasPage'
+import { FreelancerPage } from './features/freelancer/FreelancerPage'
+import { PopsPage } from './features/pops/PopsPage'
 import { HomePage } from './features/home/HomePage'
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -104,6 +107,34 @@ export default function App() {
               ) : (
                 <Navigate to="/" replace />
               )}
+            </Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mapas"
+        element={
+          <ProtectedRoute>
+            <Shell>
+              <MapasPage />
+            </Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/freelancer"
+        element={
+          <ProtectedRoute>
+            <Shell>{isAdmin ? <FreelancerPage /> : <Navigate to="/" replace />}</Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pops"
+        element={
+          <ProtectedRoute>
+            <Shell>
+              <PopsPage />
             </Shell>
           </ProtectedRoute>
         }

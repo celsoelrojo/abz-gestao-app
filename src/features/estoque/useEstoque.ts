@@ -37,7 +37,7 @@ export function useEstoqueMovimentos() {
   })
 }
 
-export function useTaxonomias(modulo: 'estoque' | 'ficha_tecnica' | 'ficha_producao') {
+export function useTaxonomias(modulo: 'estoque' | 'ficha_tecnica' | 'ficha_producao' | 'pop') {
   return useQuery({
     queryKey: TAXONOMIAS_KEY(modulo),
     queryFn: async () => {
@@ -60,7 +60,7 @@ export function taxonomiaValores(taxonomias: TaxonomiaRow[], setor: string, tipo
 // silenciosamente se já existir (unique constraint faz esse trabalho; 23505
 // = unique_violation).
 export async function registrarTaxonomia(
-  modulo: 'estoque' | 'ficha_tecnica' | 'ficha_producao',
+  modulo: 'estoque' | 'ficha_tecnica' | 'ficha_producao' | 'pop',
   setor: string,
   categoria: string,
   subcategoria: string,

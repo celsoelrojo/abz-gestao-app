@@ -115,21 +115,108 @@ export type PrintJobRow = {
   impressa_em: string | null
 }
 
-// As 4 abaixo cobrem só os campos usados pelo picker de vínculo do
-// Checklist (Mapa/POP/Ficha de Produção) — os módulos em si (CRUD completo,
-// blocos, ingredientes etc.) ainda não têm tela nesta app, só no protótipo.
+export type MapaBlockTipo = 'text' | 'image'
+
+export type MapaBlockRow = {
+  id: string
+  mapa_id: string
+  type: MapaBlockTipo
+  title: string
+  content: string | null
+  image_url: string | null
+  ordem: number
+  created_at: string
+}
+
 export type MapaFluxogramaRow = {
   id: string
   kind: 'mapa' | 'fluxograma'
   setor: Setor
   title: string
+  ordem: number
+  created_at: string
+  updated_at: string
 }
+
+export type PopStatus = 'rascunho' | 'publicada' | 'inativa'
+
+export type PopCategoryRow = {
+  id: string
+  name: string
+  ordem: number
+}
+
+export type PopResponsabilidade = { cargo: string; responsabilidade: string }
+export type PopMaterial = { descricao: string }
+export type PopEtapa = {
+  titulo: string
+  descricao: string
+  tempo: string | null
+  temperatura: string | null
+  frequencia: string | null
+  observacao: string | null
+  foto_url: string | null
+}
+export type PopAcaoCorretiva = { descricao: string }
+export type PopAnexo = { nome: string; url: string }
+export type PopHistoricoTipo = 'criacao' | 'revisao' | 'publicacao'
+export type PopHistoricoEntry = { data: string; tipo: PopHistoricoTipo; autor: string }
+export type PopVinculoTipo = 'Mapa' | 'POP'
+export type PopVinculo = { tipo: PopVinculoTipo; id: string }
 
 export type PopRow = {
   id: string
   titulo: string
-  setor: string
-  status: 'rascunho' | 'publicada' | 'inativa'
+  codigo: string | null
+  setor: 'Bar' | 'Cozinha' | 'Salão' | 'Geral'
+  category_id: string | null
+  subcategoria: string | null
+  estabelecimento: string
+  elaborado_por: string | null
+  aprovado_por: string | null
+  data_emissao: string
+  versao: number
+  ultima_revisao_em: string
+  proxima_revisao: string | null
+  status: PopStatus
+  publicado_por: string | null
+  publicado_em: string | null
+  objetivo: string
+  aplicacao: string
+  setores_aplicaveis: string[]
+  aplica_a_todos: boolean
+  responsabilidades: PopResponsabilidade[]
+  materiais: PopMaterial[]
+  etapas: PopEtapa[]
+  seguranca: string
+  alerta_importante: string | null
+  frequencia: string
+  situacoes_especificas: string | null
+  monitoramento: string
+  responsavel_monitoramento: string | null
+  checklist_vinculado_id: number | null
+  local_registro: string | null
+  acoes_corretivas: PopAcaoCorretiva[]
+  referencias: string | null
+  anexos: PopAnexo[]
+  vinculos: PopVinculo[]
+  historico: PopHistoricoEntry[]
+  ordem: number
+  created_at: string
+  updated_at: string
+}
+
+export type FreelancerRow = {
+  id: string
+  nome: string
+  setor: Setor
+  funcao: string
+  telefone: string
+  email: string | null
+  observacoes: string | null
+  status: 'ativo' | 'inativo'
+  created_at: string
+  updated_at: string
 }
 
 export type FichaStatus = 'rascunho' | 'publicada' | 'inativa'
@@ -350,7 +437,7 @@ export type EstoqueMovimentoRow = {
 
 export type TaxonomiaRow = {
   id: string
-  modulo: 'ficha_tecnica' | 'ficha_producao' | 'estoque'
+  modulo: 'ficha_tecnica' | 'ficha_producao' | 'estoque' | 'pop'
   setor: string
   tipo: 'categoria' | 'subcategoria'
   valor: string
@@ -418,9 +505,6 @@ export type ReservaCapacidadeRow = {
   capacidade: number
 }
 
-// Só os campos usados pelo resumo "Freelancers hoje" do painel de Mensagens
-// Importantes — o módulo Freelancer em si (CRUD completo) não tem tela
-// própria nesta app ainda.
 export type FreelancerEscalaRow = {
   id: string
   freelancer_id: string
@@ -464,7 +548,10 @@ export type Database = {
       print_jobs: TableDef<PrintJobRow>
       audit_log: TableDef<AuditLogRow>
       mapas_fluxogramas: TableDef<MapaFluxogramaRow>
+      mapa_blocks: TableDef<MapaBlockRow>
+      pop_categories: TableDef<PopCategoryRow>
       pops: TableDef<PopRow>
+      freelancers: TableDef<FreelancerRow>
       fichas_tecnicas: TableDef<FichaTecnicaRow>
       fichas_producao: TableDef<FichaProducaoRow>
       fichas_producao_lotes: TableDef<FichaProducaoLoteRow>

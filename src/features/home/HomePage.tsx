@@ -30,9 +30,14 @@ const MIGRATED_MODULES = [
     desc: 'Produção em lote, validade e etiquetas',
     roles: 'bar_cozinha' as const,
   },
+  { key: 'mapas', to: '/mapas', title: 'Mapas e Fluxogramas', desc: 'Layout do ambiente e fluxos de processo', roles: 'todos' as const },
+  // Igual ao protótipo (MODULE_ACCESS.freelancer = ['administrador']) — o
+  // único módulo restrito só ao Administrador, sem exceção pra Gestor.
+  { key: 'freelancer', to: '/freelancer', title: 'Freelancer', desc: 'Cadastro e escala de freelancers', roles: 'admin' as const },
+  { key: 'pops', to: '/pops', title: "POP's", desc: 'Procedimentos Operacionais Padrão', roles: 'todos' as const },
 ]
 
-const PENDING_MODULES = ['Mapas e Fluxogramas', "POP's", 'Freelancer']
+const PENDING_MODULES: string[] = []
 
 export function HomePage() {
   const profile = useAuthStore((s) => s.profile)
@@ -62,17 +67,21 @@ export function HomePage() {
         ))}
       </div>
 
-      <h3 className="section-label" style={{ marginTop: 28 }}>
-        Ainda no protótipo (abz-gestao/) — ver README para o roteiro de migração
-      </h3>
-      <div className="modules-grid">
-        {PENDING_MODULES.map((title) => (
-          <div className="module-btn" style={{ opacity: 0.45, cursor: 'default' }} key={title}>
-            <span className="module-title">{title}</span>
-            <span className="module-desc">Em migração</span>
+      {PENDING_MODULES.length > 0 && (
+        <>
+          <h3 className="section-label" style={{ marginTop: 28 }}>
+            Ainda no protótipo (abz-gestao/) — ver README para o roteiro de migração
+          </h3>
+          <div className="modules-grid">
+            {PENDING_MODULES.map((title) => (
+              <div className="module-btn" style={{ opacity: 0.45, cursor: 'default' }} key={title}>
+                <span className="module-title">{title}</span>
+                <span className="module-desc">Em migração</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   )
 }

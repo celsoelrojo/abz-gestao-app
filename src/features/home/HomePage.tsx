@@ -8,8 +8,6 @@ import { MensagensImportantesPanel } from '../mensagens/MensagensImportantesPane
 // nenhum módulo desaparece, só ainda não tem versão "de produção".
 const MIGRATED_MODULES = [
   { key: 'checklist', to: '/checklist', title: 'Checklist', desc: 'Rotina diária do bar', roles: 'todos' as const },
-  { key: 'contas', to: '/contas', title: 'Gerenciar Contas', desc: 'Usuários e acessos', roles: 'admin' as const },
-  { key: 'impressao', to: '/impressao', title: 'Configuração de Impressora', desc: 'Etiquetas de produção', roles: 'manager' as const },
   { key: 'estoque', to: '/estoque', title: 'Estoque e Compras', desc: 'Saldo, entradas e retiradas', roles: 'todos' as const },
   // Igual ao protótipo (MODULE_ACCESS.reservas): só Administrador e o setor
   // Salão (Gestor ou Atendente) — Bar/Cozinha nunca acessam este módulo.
@@ -30,11 +28,13 @@ const MIGRATED_MODULES = [
     desc: 'Produção em lote, validade e etiquetas',
     roles: 'bar_cozinha' as const,
   },
+  { key: 'pops', to: '/pops', title: "POP's", desc: 'Procedimentos Operacionais Padrão', roles: 'todos' as const },
   { key: 'mapas', to: '/mapas', title: 'Mapas e Fluxogramas', desc: 'Layout do ambiente e fluxos de processo', roles: 'todos' as const },
   // Igual ao protótipo (MODULE_ACCESS.freelancer = ['administrador']) — o
   // único módulo restrito só ao Administrador, sem exceção pra Gestor.
   { key: 'freelancer', to: '/freelancer', title: 'Freelancer', desc: 'Cadastro e escala de freelancers', roles: 'admin' as const },
-  { key: 'pops', to: '/pops', title: "POP's", desc: 'Procedimentos Operacionais Padrão', roles: 'todos' as const },
+  { key: 'contas', to: '/contas', title: 'Gerenciar Contas', desc: 'Usuários e acessos', roles: 'admin' as const },
+  { key: 'impressao', to: '/impressao', title: 'Configuração de Impressora', desc: 'Etiquetas de produção', roles: 'manager' as const },
   { key: 'auditoria', to: '/auditoria', title: 'Histórico de Auditoria', desc: 'Quem alterou o quê e quando', roles: 'admin' as const },
 ]
 

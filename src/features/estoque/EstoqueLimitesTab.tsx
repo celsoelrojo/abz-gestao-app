@@ -83,7 +83,7 @@ function LimitesRow({ item }: { item: EstoqueItemRow }) {
           </div>
         )}
       </div>
-      <div className="field-row" style={{ flex: 2, alignItems: 'flex-end' }}>
+      <div className="field-row" style={{ flex: 2 }}>
         <div className="field">
           <label>Mínimo</label>
           <input type="number" min="0" step="any" value={min} onChange={(e) => setMin(e.target.value)} />
@@ -96,9 +96,12 @@ function LimitesRow({ item }: { item: EstoqueItemRow }) {
           <label>Máximo</label>
           <input type="number" min="0" step="any" value={max} onChange={(e) => setMax(e.target.value)} />
         </div>
-        <button className="btn btn-primary" disabled={!dirty || saving} onClick={handleSave}>
-          {saving ? 'Salvando...' : 'Salvar'}
-        </button>
+        <div className="field">
+          <label style={{ visibility: 'hidden' }}>Salvar</label>
+          <button className="btn btn-primary" disabled={!dirty || saving} onClick={handleSave}>
+            {saving ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -56,7 +56,7 @@ export function ReservasPage() {
           <p className="page-subtitle">Agenda do salão</p>
         </div>
         {canManage && (
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             <button className="btn btn-ghost" onClick={() => setShowCapacidade(true)}>
               Capacidade
             </button>

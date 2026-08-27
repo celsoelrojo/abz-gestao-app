@@ -63,14 +63,17 @@ function CapacidadeRow({
   const dirty = valor !== String(valorAtual)
 
   return (
-    <div className="field-row" style={{ alignItems: 'flex-end' }}>
+    <div className="field-row">
       <div className="field">
         <label>{periodo}</label>
         <input type="number" min="0" value={valor} onChange={(e) => setValor(e.target.value)} />
       </div>
-      <button className="btn btn-primary" disabled={!dirty || saving} onClick={() => onSave(periodo, valor)}>
-        {saving ? 'Salvando...' : 'Salvar'}
-      </button>
+      <div className="field">
+        <label style={{ visibility: 'hidden' }}>Salvar</label>
+        <button className="btn btn-primary" disabled={!dirty || saving} onClick={() => onSave(periodo, valor)}>
+          {saving ? 'Salvando...' : 'Salvar'}
+        </button>
+      </div>
     </div>
   )
 }

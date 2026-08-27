@@ -18,7 +18,7 @@ Aplicativo de gestão operacional do Abrazo Drink Bar. Este é o **app de produ�
 | Mapas e Fluxogramas | ✅ Migrado — Mapas e Fluxogramas são a mesma estrutura (blocos de texto/imagem ordenáveis), sem workflow de publicação, exatamente como no protótipo; Gestor cria/edita/reordena do próprio setor, só Administrador exclui |
 | POP's | ✅ Migrado — documento de 12 seções (identificação, objetivo, aplicação, responsabilidades, materiais, etapas, segurança, frequência, monitoramento, ações corretivas, referências/anexos/vínculos, histórico), categorias globais (CRUD do Administrador, com realocação obrigatória antes de excluir) + subcategoria livre por setor. Diferente da RLS original: Gestor do setor cria/edita/publica POP's do próprio setor (igual a Mapas/Fichas), só Administrador exclui e gerencia categorias |
 | Freelancer | ✅ Migrado — Cadastro (por setor, ativar/inativar) e Escala (hoje + semana, por período Almoço/Noite). A tarefa "Pagar freelancer" no Checklist é gerada/sincronizada automaticamente por trigger no banco ao salvar a escala, nunca editável em "Gerenciar Checklist". Exclusivo do Administrador, sem exceção pra Gestor (único módulo assim) |
-| Histórico de auditoria | ⬜ Schema pronto (`audit_log`, trigger automático em todas as tabelas críticas), sem tela ainda |
+| Histórico de auditoria | ✅ Migrado — consulta com filtro por tabela/ação/responsável/período das 10 tabelas com trigger de auditoria, resumo automático do que mudou (campo a campo) e detalhe com o JSON completo de antes/depois. Exclusivo do Administrador |
 
 ## Stack
 

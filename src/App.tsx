@@ -14,6 +14,7 @@ import { FichasProducaoPage } from './features/fichas/FichasProducaoPage'
 import { MapasPage } from './features/mapas/MapasPage'
 import { FreelancerPage } from './features/freelancer/FreelancerPage'
 import { PopsPage } from './features/pops/PopsPage'
+import { AuditoriaPage } from './features/auditoria/AuditoriaPage'
 import { HomePage } from './features/home/HomePage'
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -136,6 +137,14 @@ export default function App() {
             <Shell>
               <PopsPage />
             </Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/auditoria"
+        element={
+          <ProtectedRoute>
+            <Shell>{isAdmin ? <AuditoriaPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />

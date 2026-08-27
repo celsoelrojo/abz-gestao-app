@@ -723,6 +723,12 @@ input, textarea, select { font-family: inherit; }
 }
 .pop-alert-box .inline-icon { flex-shrink: 0; margin-top: 1px; }
 .pop-simple-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; color: var(--text-primary); }
+
+.audit-json-block {
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 14px; font-size: 0.78rem; line-height: 1.5; color: var(--text-secondary);
+  overflow-x: auto; white-space: pre; max-height: 260px; overflow-y: auto;
+}
 .pop-two-col-row, .pop-one-col-row {
   display: grid; gap: 6px; align-items: center;
   background: var(--bg-elevated); border: 1px solid var(--border-soft);

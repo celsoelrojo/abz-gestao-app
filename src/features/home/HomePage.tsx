@@ -35,6 +35,7 @@ const MIGRATED_MODULES = [
   // único módulo restrito só ao Administrador, sem exceção pra Gestor.
   { key: 'freelancer', to: '/freelancer', title: 'Freelancer', desc: 'Cadastro e escala de freelancers', roles: 'admin' as const },
   { key: 'pops', to: '/pops', title: "POP's", desc: 'Procedimentos Operacionais Padrão', roles: 'todos' as const },
+  { key: 'auditoria', to: '/auditoria', title: 'Histórico de Auditoria', desc: 'Quem alterou o quê e quando', roles: 'admin' as const },
 ]
 
 const PENDING_MODULES: string[] = []

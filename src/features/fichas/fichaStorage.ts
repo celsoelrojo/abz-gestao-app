@@ -14,3 +14,11 @@ export async function fichaImagemUrl(path: string): Promise<string> {
   if (error) throw error
   return data.signedUrl
 }
+
+// "Excluir foto principal" (pedido do usuário, Identificação da Ficha de
+// Produção) — apaga o arquivo do bucket também, não só a referência na
+// ficha; sem isso o storage acumula imagem órfã pra sempre.
+export async function deleteFichaImagem(path: string): Promise<void> {
+  const { error } = await supabase.storage.from('fichas-imagens').remove([path])
+  if (error) throw error
+}

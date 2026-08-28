@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabaseClient'
-import type { Setor } from '../../types/database'
+import { supabase } from './supabaseClient'
+import type { Setor } from '../types/database'
 
 export type VinculoTipo = 'Mapa' | 'POP' | 'Ficha de Produção'
 export const VINCULO_TIPOS: VinculoTipo[] = ['Mapa', 'POP', 'Ficha de Produção']
@@ -18,12 +18,13 @@ export interface VinculoOption {
 // sempre funcionou. Mapas e Fluxogramas não têm status de publicação, então
 // entram todos do setor. POP aceita também setor 'Geral'.
 //
-// Enquanto Mapas/POP's/Fichas de Produção não têm tela própria nesta app
-// (só no protótipo antigo), estas tabelas existem no Supabase mas ficam
-// vazias — o picker funciona de verdade, só não tem o que listar ainda.
-export function useVinculoOptions(tipo: VinculoTipo | null, setor: Setor | null) {
+// Movido de features/checklist/ pra lib/ porque agora tem dois usos reais:
+// o vínculo de tarefa do Checklist e o vínculo da própria Ficha de Produção
+// (FichaProducaoFormModal) — nenhum dos dois é "dono" da lógica. `excludeId`
+// só importa pro segundo caso (uma ficha não pode se vincular a si mesma).
+export function useVinculoOptions(tipo: VinculoTipo | null, setor: Setor | null, excludeId?: string) {
   return useQuery({
-    queryKey: ['vinculo_options', tipo, setor],
+    queryKey: ['vinculo_options', tipo, setor, excludeId],
     enabled: !!tipo && !!setor,
     queryFn: async (): Promise<VinculoOption[]> => {
       if (!tipo || !setor) return []
@@ -53,7 +54,7 @@ export function useVinculoOptions(tipo: VinculoTipo | null, setor: Setor | null)
       if (producoes.error) throw producoes.error
       return [
         ...tecnicas.data.map((f) => ({ id: f.id, title: f.nome, sub: 'Ficha Técnica' })),
-        ...producoes.data.map((f) => ({ id: f.id, title: f.nome, sub: 'Ficha de Produção' })),
+        ...producoes.data.filter((f) => f.id !== excludeId).map((f) => ({ id: f.id, title: f.nome, sub: 'Ficha de Produção' })),
       ]
     },
   })

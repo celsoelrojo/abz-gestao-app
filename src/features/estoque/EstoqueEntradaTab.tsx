@@ -111,12 +111,14 @@ export function EstoqueEntradaTab({ onIrParaCadastro }: { onIrParaCadastro?: () 
           {itensDoSetor.length === 0 ? (
             <div className="empty-state" style={{ textAlign: 'left', padding: '10px 0' }}>
               Nenhum produto cadastrado em {setor} ainda.
-              {onIrParaCadastro && (
+              {onIrParaCadastro ? (
                 <div style={{ marginTop: 8 }}>
                   <button type="button" className="btn btn-ghost" onClick={onIrParaCadastro}>
                     Cadastrar produto
                   </button>
                 </div>
+              ) : (
+                <div style={{ marginTop: 4 }}>Peça pra um gestor cadastrar em "Cadastrar Produto".</div>
               )}
             </div>
           ) : (

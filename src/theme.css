@@ -349,6 +349,42 @@ input, textarea, select { font-family: inherit; }
 .module-title { font-weight: 700; font-size: 1rem; margin-top: 4px; }
 .module-desc { font-size: 0.78rem; color: var(--text-muted); text-align: center; }
 
+/* Diagramação mais visível pra home de Fichas de Produção — cartão maior em
+   vez da linha fina de .manage-row, com o nome da produção em destaque
+   (Oswald, maiúsculo, cor de contraste com o fundo). */
+.producao-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.producao-card {
+  display: flex; flex-direction: column; gap: 8px;
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.producao-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold-dark);
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-soft);
+}
+.producao-card-nome {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--gold-bright);
+}
+.producao-card-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* ============ Soon page ============ */
 .soon-box {
   text-align: center;

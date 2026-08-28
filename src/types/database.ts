@@ -307,33 +307,39 @@ export type FichaTecnicaSemCustoRow = Omit<FichaTecnicaRow, 'embalagem' | 'preco
   ingredientes: Omit<FichaIngredienteTecnica, 'qtdBase' | 'precoBase'>[]
 }
 
-export type ProducaoIngredienteTipo = 'base' | 'secundario' | 'variavel'
-
+// Ingrediente da Ficha de Produção — reformulado a pedido do usuário: o
+// produto agora É um item real do estoque (não texto livre), então nome/
+// unidade vêm de lá; custo unitário é sempre "por unidade do produto
+// vinculado" (kg/L/un, o que o estoque_itens.unidade daquele item disser).
 export type ProducaoIngrediente = {
   id: string
-  nome: string
-  unidade: string
-  qtdLotePadrao: number | null
-  qtdAjustada: number | null
-  perdas: string | null
-  observacoes: string | null
-  substituicoes: string | null
-  estoqueItemId: string | null
-  tipo: ProducaoIngredienteTipo
+  estoqueItemId: string
+  quantidade: number | null
   custoUnitario: number | null
+  percentualPerda: number | null
 }
 
+// Etapa do modo de preparo — reformulada a pedido do usuário: só título,
+// descrição, equipamento usado e foto(s). Tempo/temperatura/utensílios/ponto
+// de controle saíram do formulário (existiam antes, sem pedido explícito).
 export type ProducaoEtapa = {
   id: string
   titulo: string
   descricao: string
-  tempo: string | null
-  temperatura: string | null
   equipamento: string | null
-  utensilios: string | null
-  pontoControle: string | null
   imagens: string[]
 }
+
+export type ProducaoCondicaoArmazenamento = 'Ambiente' | 'Resfriado' | 'Congelado'
+export type ProducaoRendimentoUnidade = 'Litros' | 'Quilos' | 'Unidade' | 'Porção'
+
+// Vínculo próprio da Ficha de Produção — pedido do usuário: "Mapa/POP/Ficha
+// de produção" (não "Ficha Técnica" como em FichaVinculoTipo, usado só por
+// fichas_tecnicas). "Ficha de Produção" como rótulo busca em Fichas Técnicas
+// E Fichas de Produção publicadas — mesma semântica do vínculo do Checklist,
+// ver src/lib/vinculo.ts.
+export type ProducaoVinculoTipo = 'Mapa' | 'POP' | 'Ficha de Produção'
+export type ProducaoVinculo = { tipo: ProducaoVinculoTipo; id: string }
 
 export type FichaProducaoHistoricoTipo = 'criacao' | 'revisao' | 'publicacao'
 
@@ -357,7 +363,7 @@ export type FichaProducaoRow = {
   etapas: ProducaoEtapa[]
   prazo_validade: number | null
   unidade_validade: UnidadeValidade | null
-  condicao_armazenamento: string | null
+  condicao_armazenamento: ProducaoCondicaoArmazenamento | null
   temp_min: number | null
   temp_max: number | null
   tipo_recipiente: string | null
@@ -367,7 +373,7 @@ export type FichaProducaoRow = {
   instrucoes_etiqueta: string | null
   instrucoes_descarte: string | null
   qtd_lote_padrao: number | null
-  unidade_rendimento: string | null
+  unidade_rendimento: ProducaoRendimentoUnidade | null
   qtd_porcoes_unidades: number | null
   tempo_pre_preparo: string | null
   tempo_preparo: string | null
@@ -383,7 +389,7 @@ export type FichaProducaoRow = {
   acoes_corretivas: string | null
   alergenicos: string | null
   observacoes_gerais: string | null
-  vinculos: FichaVinculo[]
+  vinculos: ProducaoVinculo[]
   historico: FichaProducaoHistoricoEntry[]
   status: FichaStatus
   versao: number

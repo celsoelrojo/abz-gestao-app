@@ -169,6 +169,52 @@ export async function criarProdutoEstoque(input: {
   return data as EstoqueItemRow
 }
 
+// Edição do cadastro (botão "Ver/editar produtos") — mesmos campos do
+// cadastro, exceto Setor (categoria): mudar o setor de um item que já pode
+// ter saldo/movimentos/limites configurados é uma operação bem maior
+// (RLS, histórico, listas de compra por setor) e não foi pedida; quem
+// precisar disso hoje cria um produto novo no setor certo.
+export async function atualizarProdutoEstoque(
+  id: string,
+  input: {
+    title: string
+    tipoProduto: EstoqueTipoProduto
+    marca: string | null
+    produtoCategoria: string | null
+    subcategoria: string | null
+    unidade: EstoqueUnidade
+    volumePadrao: number | null
+    condicaoArmazenamento: EstoqueCondicaoArmazenamento
+    prazoValidade: number | null
+    unidadeValidade: UnidadeValidade | null
+    fichaProducaoId: string | null
+  },
+): Promise<EstoqueItemRow> {
+  const { data, error } = await supabase
+    .from('estoque_itens')
+    .update({
+      title: input.title.trim(),
+      unidade: input.unidade,
+      produto_categoria: input.produtoCategoria,
+      subcategoria: input.subcategoria,
+      tipo_produto: input.tipoProduto,
+      marca: input.marca,
+      volume_padrao: input.volumePadrao,
+      condicao_armazenamento: input.condicaoArmazenamento,
+      prazo_validade: input.prazoValidade,
+      unidade_validade: input.unidadeValidade,
+      ficha_producao_id: input.fichaProducaoId,
+    })
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) {
+    if (error.code === '23505') throw new Error('Já existe um produto com esse nome cadastrado neste setor.')
+    throw error
+  }
+  return data as EstoqueItemRow
+}
+
 // Nota: existiu aqui um findOrCreateEstoqueItem() usado pela aba "Entrada no
 // Estoque" pra criar produto na hora, digitando o nome livre. Removido
 // quando Entrada passou a exigir produto já cadastrado (ver

@@ -3,6 +3,8 @@ import {
   calcFichaCustos,
   calcIngredienteCustoTotal,
   calcIngredienteCustoUnitario,
+  calcProducaoFichaCustoTotal,
+  calcProducaoIngredienteCustoTotal,
   calcValidadeDateTime,
   calcularProducaoEscalada,
   gerarNumeroLote,
@@ -66,21 +68,41 @@ describe('calcValidadeDateTime', () => {
   })
 })
 
-describe('calcularProducaoEscalada', () => {
-  it('escala os demais ingredientes e o rendimento pela razão do ingrediente base', () => {
+describe('calcProducaoIngredienteCustoTotal', () => {
+  it('quantidade × custo unitário', () => {
+    expect(calcProducaoIngredienteCustoTotal({ quantidade: 2, custoUnitario: 15 })).toBe(30)
+  })
+  it('zero quando algum dos dois falta', () => {
+    expect(calcProducaoIngredienteCustoTotal({ quantidade: null, custoUnitario: 15 })).toBe(0)
+    expect(calcProducaoIngredienteCustoTotal({ quantidade: 2, custoUnitario: null })).toBe(0)
+  })
+})
+
+describe('calcProducaoFichaCustoTotal', () => {
+  it('soma o custo de todos os ingredientes', () => {
     const ingredientes = [
-      { id: 'base', qtdLotePadrao: 1000 },
-      { id: 'sec', qtdLotePadrao: 200 },
+      { quantidade: 2, custoUnitario: 15 }, // 30
+      { quantidade: 0.5, custoUnitario: 40 }, // 20
     ]
-    const resultado = calcularProducaoEscalada(ingredientes, 'base', 2000, 40)
+    expect(calcProducaoFichaCustoTotal(ingredientes)).toBe(50)
+  })
+})
+
+describe('calcularProducaoEscalada', () => {
+  it('escala todos os ingredientes pela razão rendimento desejado / rendimento padrão', () => {
+    const ingredientes = [
+      { id: 'a', quantidade: 1000 },
+      { id: 'b', quantidade: 200 },
+    ]
+    const resultado = calcularProducaoEscalada(ingredientes, 500, 1000)
     expect(resultado?.ratio).toBe(2)
-    expect(resultado?.quantidades['sec']).toBe(400)
-    expect(resultado?.rendimentoAjustado).toBe(80)
+    expect(resultado?.quantidades['a']).toBe(2000)
+    expect(resultado?.quantidades['b']).toBe(400)
   })
 
-  it('null quando o ingrediente base não tem qtdLotePadrao configurada', () => {
-    const ingredientes = [{ id: 'base', qtdLotePadrao: null }]
-    expect(calcularProducaoEscalada(ingredientes, 'base', 100, 10)).toBeNull()
+  it('null quando não há rendimento padrão configurado ou desejado <= 0', () => {
+    expect(calcularProducaoEscalada([{ id: 'a', quantidade: 100 }], null, 50)).toBeNull()
+    expect(calcularProducaoEscalada([{ id: 'a', quantidade: 100 }], 500, 0)).toBeNull()
   })
 })
 

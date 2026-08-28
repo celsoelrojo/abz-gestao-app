@@ -1,28 +1,34 @@
 import { useMemo, useState } from 'react'
 import { calcularProducaoEscalada } from './fichaHelpers'
-import type { ProducaoIngrediente } from '../../types/database'
+import type { EstoqueItemRow, ProducaoIngrediente } from '../../types/database'
 
 // Ferramenta só de leitura/preview — nunca grava na ficha salva (espelha
-// updateProducaoCalculator do protótipo). Só funciona se houver um
-// ingrediente marcado como "Base".
+// updateProducaoCalculator do protótipo). Escala pelo Rendimento declarado
+// na ficha (qtd_lote_padrao/unidade_rendimento), não mais por um ingrediente
+// "Base" (removido do formulário — ver fichaHelpers.calcularProducaoEscalada).
 export function ProducaoCalculadora({
   ingredientes,
-  qtdPorcoesUnidades,
+  estoqueItens,
+  qtdLotePadrao,
+  unidadeRendimento,
 }: {
   ingredientes: ProducaoIngrediente[]
-  qtdPorcoesUnidades: number | null
+  estoqueItens: EstoqueItemRow[]
+  qtdLotePadrao: number | null
+  unidadeRendimento: string | null
 }) {
-  const base = useMemo(() => ingredientes.find((i) => i.tipo === 'base'), [ingredientes])
-  const [quantidade, setQuantidade] = useState('')
+  const [rendimentoDesejado, setRendimentoDesejado] = useState('')
+
+  const itemPorId = useMemo(() => new Map(estoqueItens.map((it) => [it.id, it])), [estoqueItens])
 
   const resultado = useMemo(() => {
-    const qtd = Number(quantidade)
-    if (!base || !(qtd > 0)) return null
-    return calcularProducaoEscalada(ingredientes, base.id, qtd, qtdPorcoesUnidades)
-  }, [ingredientes, base, quantidade, qtdPorcoesUnidades])
+    const desejado = Number(rendimentoDesejado)
+    if (!(desejado > 0)) return null
+    return calcularProducaoEscalada(ingredientes, qtdLotePadrao, desejado)
+  }, [ingredientes, qtdLotePadrao, rendimentoDesejado])
 
-  if (!base) {
-    return <p className="field-hint">Marque um ingrediente como "Base" na ficha para habilitar a calculadora de produção.</p>
+  if (!qtdLotePadrao) {
+    return <p className="field-hint">Configure o Rendimento na ficha (Validade e Rendimento) para habilitar a calculadora.</p>
   }
 
   return (
@@ -30,31 +36,31 @@ export function ProducaoCalculadora({
       <div className="field-row">
         <div className="field">
           <label>
-            Quantidade desejada de {base.nome || 'ingrediente base'} ({base.unidade})
+            Rendimento desejado {unidadeRendimento ? `(${unidadeRendimento})` : ''}
           </label>
-          <input type="number" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} placeholder={base.qtdLotePadrao?.toString() ?? ''} />
+          <input
+            type="number"
+            value={rendimentoDesejado}
+            onChange={(e) => setRendimentoDesejado(e.target.value)}
+            placeholder={qtdLotePadrao.toString()}
+          />
         </div>
       </div>
       {resultado && (
         <div className="manage-list">
-          {ingredientes
-            .filter((i) => i.id !== base.id)
-            .map((i) => (
-              <div className="manage-row" key={i.id}>
+          {ingredientes.map((ing) => {
+            const item = itemPorId.get(ing.estoqueItemId)
+            return (
+              <div className="manage-row" key={ing.id}>
                 <div className="manage-row-info">
-                  <strong>{i.nome || '(sem nome)'}</strong>
+                  <strong>{item?.title ?? '(produto não encontrado)'}</strong>
                   <span>
-                    {(resultado.quantidades[i.id] ?? 0).toFixed(3)} {i.unidade}
+                    {(resultado.quantidades[ing.id] ?? 0).toFixed(3)} {item?.unidade ?? ''}
                   </span>
                 </div>
               </div>
-            ))}
-          <div className="manage-row">
-            <div className="manage-row-info">
-              <strong>Rendimento ajustado</strong>
-              <span>{resultado.rendimentoAjustado.toFixed(2)}</span>
-            </div>
-          </div>
+            )
+          })}
         </div>
       )}
     </div>

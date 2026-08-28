@@ -1,13 +1,16 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { isFullAdmin, useAuthStore } from '../../store/authStore'
+import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
 import { visibleCategorias } from './estoqueAccess'
+import { agruparPorCampo, ordenarPorTitulo } from './estoqueHelpers'
 import {
   ESTOQUE_CONDICOES_ARMAZENAMENTO,
   ESTOQUE_TIPOS_PRODUTO,
   ESTOQUE_UNIDADES_PRODUTO,
   UNIDADES_VALIDADE,
 } from './estoqueConstants'
+import { EditarProdutoModal } from './EditarProdutoModal'
+import { TaxonomiaField } from './TaxonomiaField'
 import {
   ESTOQUE_ITENS_KEY,
   TAXONOMIAS_KEY,
@@ -21,6 +24,7 @@ import {
 import type {
   EstoqueCategoria,
   EstoqueCondicaoArmazenamento,
+  EstoqueItemRow,
   EstoqueTipoProduto,
   EstoqueUnidade,
   UnidadeValidade,
@@ -30,9 +34,17 @@ export function EstoqueCadastrarProdutoTab() {
   const profile = useAuthStore((s) => s.profile)
   const queryClient = useQueryClient()
   const setores = visibleCategorias(profile)
+  const canManage = isManager(profile)
   // Mesma trava de setor das outras abas: Administrador escolhe livre,
   // qualquer outro perfil fica preso ao próprio setor.
   const locked = isFullAdmin(profile) ? null : (profile?.setor ?? null)
+
+  // Pedido do usuário: botão pra ver/editar produtos já cadastrados, restrito
+  // a quem já tem permissão de editar estoque_itens via RLS (Administrador ou
+  // Gestor do setor) — a mesma tela de cadastro também é usada por qualquer
+  // funcionário do setor (managerOnly:false no SUBMENU), então essa restrição
+  // é só da aba de listagem/edição, não do cadastro de produto novo em si.
+  const [view, setView] = useState<'novo' | 'lista'>('novo')
 
   const [setor, setSetor] = useState<EstoqueCategoria>((locked as EstoqueCategoria | null) ?? setores[0] ?? 'Bar')
   const [tipoProduto, setTipoProduto] = useState<EstoqueTipoProduto>('Matéria Prima')
@@ -147,14 +159,38 @@ export function EstoqueCadastrarProdutoTab() {
     }
   }
 
+  const header = (
+    <div className="checklist-header" style={{ marginBottom: 16 }}>
+      <div>
+        <h3 className="page-title" style={{ marginBottom: 4 }}>
+          {view === 'novo' ? 'Cadastrar Produto' : 'Produtos cadastrados'}
+        </h3>
+        <p className="page-subtitle">
+          {view === 'novo'
+            ? 'Cadastro base do produto — usado por Entrada, Retirada, Estoque Mínimo/Máximo e Lista de Compras.'
+            : 'Ver e editar produtos já cadastrados.'}
+        </p>
+      </div>
+      {canManage && (
+        <button type="button" className="btn btn-ghost" onClick={() => setView(view === 'novo' ? 'lista' : 'novo')}>
+          {view === 'novo' ? 'Ver / editar produtos' : '+ Novo produto'}
+        </button>
+      )}
+    </div>
+  )
+
+  if (view === 'lista') {
+    return (
+      <div>
+        {header}
+        <ProdutosCadastradosLista itens={itens ?? []} setores={setores} />
+      </div>
+    )
+  }
+
   return (
     <div>
-      <h3 className="page-title" style={{ marginBottom: 4 }}>
-        Cadastrar Produto
-      </h3>
-      <p className="page-subtitle" style={{ marginBottom: 16 }}>
-        Cadastro base do produto — usado por Entrada, Retirada, Estoque Mínimo/Máximo e Lista de Compras.
-      </p>
+      {header}
       <form className="modal-body" onSubmit={handleSubmit} style={{ maxWidth: 560 }}>
         <div className="field">
           <label>Setor do produto *</label>
@@ -314,91 +350,45 @@ export function EstoqueCadastrarProdutoTab() {
   )
 }
 
-// Select de valor controlado (categoria/subcategoria), com um botão pequeno
-// ao lado pra registrar um valor novo na tabela de sugestões (taxonomias) e
-// já deixá-lo selecionado — pedido explícito do usuário ("botão pequeno ao
-// lado: adicionar categoria/subcategoria"), diferente do padrão de
-// input+datalist livre usado na aba Entrada.
-function TaxonomiaField({
-  label,
-  valor,
-  onChange,
-  opcoes,
-  onAdd,
-  addTitle,
-  placeholder,
-}: {
-  label: string
-  valor: string
-  onChange: (v: string) => void
-  opcoes: string[]
-  onAdd: (v: string) => void
-  addTitle: string
-  placeholder: string
-}) {
-  const [adding, setAdding] = useState(false)
-  const [novo, setNovo] = useState('')
+function ProdutosCadastradosLista({ itens, setores }: { itens: EstoqueItemRow[]; setores: EstoqueCategoria[] }) {
+  const [editando, setEditando] = useState<EstoqueItemRow | null>(null)
 
-  function confirmAdd() {
-    const v = novo.trim()
-    if (!v) return
-    onAdd(v)
-    setNovo('')
-    setAdding(false)
-  }
+  const itensVisiveis = useMemo(() => itens.filter((it) => setores.includes(it.categoria)), [itens, setores])
+  const porSetor = useMemo(() => agruparPorCampo(itensVisiveis, (it) => it.categoria, '—'), [itensVisiveis])
 
   return (
-    <div className="field">
-      <label>{label}</label>
-      {adding ? (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={novo}
-            onChange={(e) => setNovo(e.target.value)}
-            placeholder={placeholder}
-            autoFocus
-            style={{ flex: 1 }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                confirmAdd()
-              }
-              if (e.key === 'Escape') {
-                setAdding(false)
-                setNovo('')
-              }
-            }}
-          />
-          <button type="button" className="icon-btn" title="Confirmar" onClick={confirmAdd}>
-            ✓
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            title="Cancelar"
-            onClick={() => {
-              setAdding(false)
-              setNovo('')
-            }}
-          >
-            ✕
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <select value={valor} onChange={(e) => onChange(e.target.value)} style={{ flex: 1 }}>
-            <option value="">Selecione...</option>
-            {opcoes.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
+    <div>
+      {porSetor.length === 0 && <div className="empty-state">Nenhum produto cadastrado ainda.</div>}
+      {porSetor.map((grupo) => (
+        <div key={grupo.chave} style={{ marginBottom: 20 }}>
+          <h4 className="section-label">{grupo.chave}</h4>
+          <div className="manage-list">
+            {ordenarPorTitulo(grupo.itens).map((it) => (
+              <div className="manage-row" key={it.id}>
+                <div className="manage-row-info">
+                  <strong>
+                    {it.title}
+                    {it.marca ? ` — ${it.marca}` : ''}
+                  </strong>
+                  <span>
+                    {it.tipo_produto} · {it.unidade}
+                    {it.produto_categoria ? ` · ${it.produto_categoria}` : ''}
+                    {it.subcategoria ? ` · ${it.subcategoria}` : ''}
+                    {it.condicao_armazenamento ? ` · ${it.condicao_armazenamento}` : ''}
+                  </span>
+                </div>
+                <div className="manage-row-actions">
+                  <button className="icon-btn" title="Editar" onClick={() => setEditando(it)}>
+                    ✎
+                  </button>
+                </div>
+              </div>
             ))}
-          </select>
-          <button type="button" className="icon-btn" title={addTitle} onClick={() => setAdding(true)}>
-            +
-          </button>
+          </div>
         </div>
-      )}
+      ))}
+
+      {editando && <EditarProdutoModal item={editando} onClose={() => setEditando(null)} onSaved={() => setEditando(null)} />}
     </div>
   )
 }

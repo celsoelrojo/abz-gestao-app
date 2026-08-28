@@ -18,7 +18,7 @@ const SUBMENU: { key: EstoqueTab; title: string; desc: string; icon: IconName; m
     title: 'Cadastrar Produto',
     desc: 'Base do produto: tipo, marca, categoria, validade',
     icon: 'estoque-cadastrar',
-    managerOnly: false,
+    managerOnly: true,
   },
   { key: 'entrada', title: 'Entrada no Estoque', desc: 'Cadastrar produto e registrar entrada', icon: 'estoque-entrada', managerOnly: false },
   { key: 'retirada', title: 'Retirada do Estoque', desc: 'Registrar saída de itens', icon: 'estoque-retirada', managerOnly: true },
@@ -68,7 +68,9 @@ export function EstoquePage() {
 
       {activeTab === 'atual' && <EstoqueAtualTab />}
       {activeTab === 'cadastrar' && <EstoqueCadastrarProdutoTab />}
-      {activeTab === 'entrada' && <EstoqueEntradaTab onIrParaCadastro={() => setTab('cadastrar')} />}
+      {activeTab === 'entrada' && (
+        <EstoqueEntradaTab onIrParaCadastro={canManage ? () => setTab('cadastrar') : undefined} />
+      )}
       {activeTab === 'retirada' && <EstoqueRetiradaTab />}
       {activeTab === 'limites' && <EstoqueLimitesTab />}
       {activeTab === 'compras' && <EstoqueComprasTab />}

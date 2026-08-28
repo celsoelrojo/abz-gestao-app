@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useEstoqueItens } from '../estoque/useEstoque'
+import { calcProducaoFichaCustoTotal, calcProducaoIngredienteCustoTotal } from './fichaHelpers'
 import { FICHAS_PRODUCAO_LOTES_KEY, useFichaProducaoLotes } from './useFichasProducao'
 import { FichaProducaoLoteFormModal } from './FichaProducaoLoteFormModal'
 import { ProducaoCalculadora } from './ProducaoCalculadora'
 import { fichaImagemUrl } from './fichaStorage'
-import type { FichaProducaoLoteRow, FichaProducaoRow } from '../../types/database'
+import type { EstoqueItemRow, FichaProducaoLoteRow, FichaProducaoRow } from '../../types/database'
 
 export function FichaProducaoDetailModal({ ficha, onClose }: { ficha: FichaProducaoRow; onClose: () => void }) {
   const queryClient = useQueryClient()
   const { data: lotes } = useFichaProducaoLotes(ficha.id)
+  const { data: estoqueItens } = useEstoqueItens()
   const [registrandoLote, setRegistrandoLote] = useState(false)
   const [aba, setAba] = useState<'ficha' | 'lotes' | 'calculadora'>('ficha')
 
@@ -38,7 +41,7 @@ export function FichaProducaoDetailModal({ ficha, onClose }: { ficha: FichaProdu
             </button>
           </div>
 
-          {aba === 'ficha' && <FichaInfo ficha={ficha} />}
+          {aba === 'ficha' && <FichaInfo ficha={ficha} estoqueItens={estoqueItens ?? []} />}
 
           {aba === 'lotes' && (
             <div>
@@ -50,7 +53,12 @@ export function FichaProducaoDetailModal({ ficha, onClose }: { ficha: FichaProdu
           )}
 
           {aba === 'calculadora' && (
-            <ProducaoCalculadora ingredientes={ficha.ingredientes} qtdPorcoesUnidades={ficha.qtd_porcoes_unidades} />
+            <ProducaoCalculadora
+              ingredientes={ficha.ingredientes}
+              estoqueItens={estoqueItens ?? []}
+              qtdLotePadrao={ficha.qtd_lote_padrao}
+              unidadeRendimento={ficha.unidade_rendimento}
+            />
           )}
 
           <div className="modal-footer">
@@ -76,7 +84,9 @@ export function FichaProducaoDetailModal({ ficha, onClose }: { ficha: FichaProdu
   )
 }
 
-function FichaInfo({ ficha }: { ficha: FichaProducaoRow }) {
+function FichaInfo({ ficha, estoqueItens }: { ficha: FichaProducaoRow; estoqueItens: EstoqueItemRow[] }) {
+  const custoTotalReceita = calcProducaoFichaCustoTotal(ficha.ingredientes)
+
   return (
     <div>
       <div className="account-badges" style={{ marginBottom: 12 }}>
@@ -86,22 +96,23 @@ function FichaInfo({ ficha }: { ficha: FichaProducaoRow }) {
 
       <h4 className="section-label">Ingredientes</h4>
       <div className="manage-list">
-        {ficha.ingredientes.map((ing) => (
-          <div className="manage-row" key={ing.id}>
-            <div className="manage-row-info">
-              <strong>
-                {ing.nome || '(sem nome)'} {ing.tipo === 'base' && '· Base'}
-              </strong>
-              <span>
-                Qtd. lote padrão: {ing.qtdLotePadrao ?? '—'} {ing.unidade}
-                {ing.perdas ? ` · Perdas: ${ing.perdas}` : ''}
-                {ing.substituicoes ? ` · Substituições: ${ing.substituicoes}` : ''}
-              </span>
+        {ficha.ingredientes.map((ing) => {
+          const item = estoqueItens.find((it) => it.id === ing.estoqueItemId)
+          return (
+            <div className="manage-row" key={ing.id}>
+              <div className="manage-row-info">
+                <strong>{item?.title ?? '(produto não encontrado)'}</strong>
+                <span>
+                  Qtd: {ing.quantidade ?? '—'} {item?.unidade ?? ''} · Custo: R$ {calcProducaoIngredienteCustoTotal(ing).toFixed(2)}
+                  {ing.percentualPerda != null ? ` · Perda: ${ing.percentualPerda}%` : ''}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
         {ficha.ingredientes.length === 0 && <div className="empty-state">Nenhum ingrediente cadastrado.</div>}
       </div>
+      {ficha.ingredientes.length > 0 && <p className="field-hint">Custo total da receita: R$ {custoTotalReceita.toFixed(2)}</p>}
 
       <h4 className="section-label">Modo de preparo</h4>
       <div className="manage-list">
@@ -112,11 +123,8 @@ function FichaInfo({ ficha }: { ficha: FichaProducaoRow }) {
                 {i + 1}. {et.titulo || '(sem título)'}
               </strong>
               <span style={{ display: 'block' }}>{et.descricao}</span>
-              {(et.tempo || et.temperatura || et.equipamento || et.pontoControle) && (
-                <span style={{ display: 'block' }}>
-                  {[et.tempo, et.temperatura, et.equipamento, et.pontoControle].filter(Boolean).join(' · ')}
-                </span>
-              )}
+              {et.equipamento && <span style={{ display: 'block' }}>Equipamento: {et.equipamento}</span>}
+              {et.imagens.length > 0 && <span style={{ display: 'block' }}>{et.imagens.length} foto(s)</span>}
             </div>
           </div>
         ))}
@@ -127,15 +135,15 @@ function FichaInfo({ ficha }: { ficha: FichaProducaoRow }) {
         <div className="field">
           <label>Validade</label>
           <p>
-            {ficha.prazo_validade ? `${ficha.prazo_validade} ${ficha.unidade_validade}` : '—'}
+            {ficha.prazo_validade ? `${ficha.prazo_validade} dias` : '—'}
             {ficha.condicao_armazenamento ? ` · ${ficha.condicao_armazenamento}` : ''}
           </p>
         </div>
-        {(ficha.temp_min != null || ficha.temp_max != null) && (
+        {ficha.qtd_lote_padrao != null && (
           <div className="field">
-            <label>Faixa de temperatura</label>
+            <label>Rendimento</label>
             <p>
-              {ficha.temp_min ?? '—'}°C a {ficha.temp_max ?? '—'}°C
+              {ficha.qtd_lote_padrao} {ficha.unidade_rendimento ?? ''}
             </p>
           </div>
         )}

@@ -126,16 +126,14 @@ export function FichasProducaoPage() {
           </div>
 
           {isLoading && <div className="empty-state">Carregando…</div>}
-          <div className="manage-list">
+          <div className="producao-grid">
             {publicadas.length === 0 && !isLoading && <div className="empty-state">Nenhuma ficha de produção encontrada.</div>}
             {publicadas.map((f) => (
-              <button className="manage-row" key={f.id} onClick={() => setDetalhe(f)} style={{ textAlign: 'left', width: '100%' }}>
-                <div className="manage-row-info">
-                  <strong>{f.nome}</strong>
-                  <span>
-                    {f.setor}
-                    {f.categoria ? ` · ${f.categoria}` : ''}
-                  </span>
+              <button className="producao-card" key={f.id} onClick={() => setDetalhe(f)}>
+                <span className="producao-card-nome">{f.nome}</span>
+                <div className="producao-card-meta">
+                  <span className="badge-status badge-status-ativa">{f.setor}</span>
+                  {f.categoria && <span className="badge-status badge-status-pendente">{f.categoria}</span>}
                 </div>
               </button>
             ))}

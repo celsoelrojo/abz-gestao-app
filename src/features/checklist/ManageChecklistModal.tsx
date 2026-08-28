@@ -4,7 +4,7 @@ import { isFullAdmin, useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabaseClient'
 import { toggleSemanaDoMes, toggleValue } from './taskFormHelpers'
 import { CHECKLIST_TASKS_ALL_KEY, CHECKLIST_TASKS_KEY, useAllChecklistTasksForManage } from './useChecklistTasks'
-import { VINCULO_TIPOS, useVinculoOptions, type VinculoTipo } from './vinculo'
+import { VINCULO_TIPOS, useVinculoOptions, type VinculoTipo } from '../../lib/vinculo'
 import type { ChecklistTaskRow, Periodicidade, Setor, Weekday } from '../../types/database'
 
 const ALL_WEEKDAYS: Weekday[] = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']

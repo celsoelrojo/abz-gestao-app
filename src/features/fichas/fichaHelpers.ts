@@ -1,4 +1,4 @@
-import type { FichaIngredienteTecnica, UnidadeValidade } from '../../types/database'
+import type { FichaIngredienteTecnica, ProducaoIngrediente, UnidadeValidade } from '../../types/database'
 
 // Espelha calcIngredienteCustoUnitario/calcIngredienteCustoTotal/
 // calcFichaCustos do protótipo (script.js:7635-7657) — o custo NUNCA é
@@ -61,37 +61,45 @@ export function calcValidadeDateTime(
   return base
 }
 
-// Espelha updateProducaoCalculator (script.js:9021-9058) — só leitura,
-// nunca reescreve a receita salva. ratio = quantidade digitada / quantidade
-// padrão do ingrediente Base; todo o resto escala proporcionalmente.
+// Custo do ingrediente = quantidade × custo unitário do produto do estoque
+// vinculado (o custo unitário já é "por unidade do produto", kg/L/un — ver
+// EstoqueCadastrarProdutoTab/estoque_itens.unidade). Percentual de perda é só
+// informativo, igual qtdLiquida/fatorCorrecao em Fichas Técnicas — nenhuma
+// fórmula de custo usa perda, pra nunca confundir de onde um número veio.
+export function calcProducaoIngredienteCustoTotal(ing: Pick<ProducaoIngrediente, 'quantidade' | 'custoUnitario'>): number {
+  return (Number(ing.quantidade) || 0) * (Number(ing.custoUnitario) || 0)
+}
+
+export function calcProducaoFichaCustoTotal(ingredientes: Pick<ProducaoIngrediente, 'quantidade' | 'custoUnitario'>[]): number {
+  return ingredientes.reduce((sum, ing) => sum + calcProducaoIngredienteCustoTotal(ing), 0)
+}
+
+// Escala a receita pelo Rendimento (qtd_lote_padrao) — ratio = rendimento
+// desejado / rendimento padrão da ficha, aplicado a todos os ingredientes.
+// Substitui a versão antiga baseada em escolher um ingrediente "Base"
+// (removida junto com o campo tipo, que não fazia parte do pedido do
+// usuário pro novo formulário) — o Rendimento já é o número que a ficha
+// declara pra "quanto essa receita rende", então é a base natural pra
+// escalar tudo o resto.
 export interface CalculadoraResultado {
   ratio: number
   quantidades: Record<string, number> // ingredienteId -> quantidade calculada
-  rendimentoAjustado: number
 }
 
 export function calcularProducaoEscalada(
-  ingredientes: { id: string; qtdLotePadrao: number | null }[],
-  baseIngredienteId: string,
-  quantidadeDigitada: number,
-  qtdPorcoesUnidades: number | null,
+  ingredientes: { id: string; quantidade: number | null }[],
+  rendimentoPadrao: number | null,
+  rendimentoDesejado: number,
 ): CalculadoraResultado | null {
-  const base = ingredientes.find((i) => i.id === baseIngredienteId)
-  const baseQtdPadrao = Number(base?.qtdLotePadrao) || 0
-  if (!base || baseQtdPadrao <= 0 || !(quantidadeDigitada > 0)) return null
+  const padrao = Number(rendimentoPadrao) || 0
+  if (padrao <= 0 || !(rendimentoDesejado > 0)) return null
 
-  const ratio = quantidadeDigitada / baseQtdPadrao
+  const ratio = rendimentoDesejado / padrao
   const quantidades: Record<string, number> = {}
-  ingredientes
-    .filter((i) => i.id !== baseIngredienteId)
-    .forEach((i) => {
-      quantidades[i.id] = (Number(i.qtdLotePadrao) || 0) * ratio
-    })
-  return {
-    ratio,
-    quantidades,
-    rendimentoAjustado: (Number(qtdPorcoesUnidades) || 0) * ratio,
-  }
+  ingredientes.forEach((i) => {
+    quantidades[i.id] = (Number(i.quantidade) || 0) * ratio
+  })
+  return { ratio, quantidades }
 }
 
 // Espelha gerarNumeroLote do protótipo: prefixo do código (ou 3 primeiras

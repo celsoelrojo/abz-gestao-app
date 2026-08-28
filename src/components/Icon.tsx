@@ -18,6 +18,7 @@ const OVERRIDES: Partial<Record<string, { strokeWidth?: number; scale?: number }
   'estoque-retirada': { scale: 2 },
   'estoque-limites': { scale: 2 },
   'estoque-compras': { scale: 2 },
+  'estoque-cadastrar': { scale: 2 },
   // +70% pedido pelo usuário nos ícones do menu principal (Home) — as 11
   // chaves abaixo são usadas só ali, nenhuma é compartilhada com o submenu
   // de Estoque (que já tem sua própria escala acima).
@@ -103,6 +104,17 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M4 6h2l2 11h10l1.7-8H7.2" />
       <circle cx="9.5" cy="20" r="1.2" fill="currentColor" stroke="none" />
       <circle cx="16" cy="20" r="1.2" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Cadastrar Produto: a mesma caixa isométrica, menor e deslocada pro canto
+  // inferior esquerdo, com um "+" no canto superior direito.
+  'estoque-cadastrar': (
+    <>
+      <path d="M3 13l6-3 6 3v6l-6 3-6-3Z" />
+      <path d="M3 13l6 3 6-3" />
+      <path d="M9 16v6" />
+      <path d="M18 2v7" />
+      <path d="M14.5 5.5h7" />
     </>
   ),
   reservas: (

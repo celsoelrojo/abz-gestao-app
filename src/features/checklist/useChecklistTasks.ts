@@ -65,7 +65,9 @@ export function useChecklistConclusoesRange(startIso: string, endIso: string) {
 // atraso resolvida) aparece na hora pro Gestor, sem F5, mesmo tendo sido
 // outro usuário a agir. Sem filtro de data aqui (a tela usa uma janela
 // grande, não um dia fixo), então o predicate cobre qualquer query de
-// conclusões independente do intervalo pedido.
+// conclusões independente do intervalo pedido. Também invalida o resumo do
+// dia (barras da Home), que depende da mesma tabela por baixo (RPC
+// checklist_concluidas_em).
 export function useChecklistRealtime() {
   const queryClient = useQueryClient()
 
@@ -73,7 +75,9 @@ export function useChecklistRealtime() {
     const channel = supabase
       .channel('checklist_conclusoes:all')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist_conclusoes' }, () => {
-        queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'checklist_conclusoes' })
+        queryClient.invalidateQueries({
+          predicate: (q) => q.queryKey[0] === 'checklist_conclusoes' || q.queryKey[0] === 'checklist_resumo_dia',
+        })
       })
       .subscribe()
 

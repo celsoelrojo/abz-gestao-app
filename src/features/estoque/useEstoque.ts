@@ -1,11 +1,21 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import type { EstoqueCategoria, EstoqueItemRow, EstoqueMovimentoRow, TaxonomiaRow } from '../../types/database'
+import type {
+  EstoqueCategoria,
+  EstoqueCondicaoArmazenamento,
+  EstoqueItemRow,
+  EstoqueMovimentoRow,
+  EstoqueTipoProduto,
+  EstoqueUnidade,
+  TaxonomiaRow,
+  UnidadeValidade,
+} from '../../types/database'
 
 export const ESTOQUE_ITENS_KEY = ['estoque_itens']
 export const ESTOQUE_MOVIMENTOS_KEY = ['estoque_movimentos']
 export const TAXONOMIAS_KEY = (modulo: string) => ['taxonomias', modulo]
+export const FICHAS_PRODUCAO_OPTIONS_KEY = (setor: string) => ['fichas_producao_options', setor]
 
 // RLS já restringe pra categoria do próprio setor (ou tudo, se Administrador)
 // — o client só pede tudo que existir.
@@ -96,50 +106,71 @@ export function useEstoqueRealtime() {
   }, [queryClient])
 }
 
-// Acha um item existente (case-insensitive, mesma categoria) ou cria um novo
-// com saldo zerado — mesma lógica de findOrCreateEstoqueItem do protótipo,
-// usada tanto por "Dar Entrada" (produto digitado livre) quanto pelo fluxo
-// de Entrada por Produção do Checklist (quando existir).
-export async function findOrCreateEstoqueItem(
-  categoria: EstoqueCategoria,
-  title: string,
-  unidade: EstoqueItemRow['unidade'],
-  produtoCategoria: string | null = null,
-  subcategoria: string | null = null,
-): Promise<EstoqueItemRow> {
-  const { data: existing, error: selectError } = await supabase
-    .from('estoque_itens')
-    .select('*')
-    .eq('categoria', categoria)
-    .ilike('title', title.trim())
-    .maybeSingle()
-  if (selectError) throw selectError
+// Fichas de Produção do setor — usadas só pra popular o vínculo "Ficha de
+// preparo" no cadastro de produto Remanufaturado. Salão/Material de
+// Limpeza/Outros nunca têm fichas_producao (setor lá é sempre Bar/Cozinha),
+// então devolve lista vazia sem nem consultar o banco.
+export function useFichasProducaoOptions(setor: EstoqueCategoria | null) {
+  return useQuery({
+    queryKey: FICHAS_PRODUCAO_OPTIONS_KEY(setor ?? ''),
+    queryFn: async () => {
+      if (setor !== 'Bar' && setor !== 'Cozinha') return []
+      const { data, error } = await supabase.from('fichas_producao').select('id, nome').eq('setor', setor).order('nome')
+      if (error) throw error
+      return data as { id: string; nome: string }[]
+    },
+    enabled: !!setor,
+  })
+}
 
-  if (existing) {
-    const item = existing as EstoqueItemRow
-    const patch: Partial<Pick<EstoqueItemRow, 'produto_categoria' | 'subcategoria'>> = {}
-    if (produtoCategoria !== null && produtoCategoria !== item.produto_categoria) patch.produto_categoria = produtoCategoria
-    if (subcategoria !== null && subcategoria !== item.subcategoria) patch.subcategoria = subcategoria
-    if (Object.keys(patch).length === 0) return item
-    // Um funcionário comum (não-gestor) pode lançar entrada mas não tem
-    // permissão de UPDATE em estoque_itens (RLS) — nesse caso a
-    // classificação simplesmente não é atualizada, mas a entrada em si
-    // (via RPC, que roda com privilégio próprio) continua funcionando.
-    const { data: updated, error: updateError } = await supabase
-      .from('estoque_itens')
-      .update(patch)
-      .eq('id', item.id)
-      .select('*')
-      .single()
-    if (updateError) return item
-    return updated as EstoqueItemRow
-  }
-
-  const { data: created, error: insertError } = await supabase
+// Cadastro de produto (tela "Cadastrar Produto") — cria a linha em
+// estoque_itens com saldo zerado e todos os metadados do formulário. Mesma
+// tabela usada por Entrada/Retirada/Limites/Compras, então esse cadastro já
+// vira a base pra tudo, como pedido. Unique(categoria, title) devolve 23505
+// se já existir produto com esse nome no setor — traduzido pra mensagem
+// amigável em vez do erro cru do Postgres.
+export async function criarProdutoEstoque(input: {
+  categoria: EstoqueCategoria
+  title: string
+  tipoProduto: EstoqueTipoProduto
+  marca: string | null
+  produtoCategoria: string | null
+  subcategoria: string | null
+  unidade: EstoqueUnidade
+  volumePadrao: number | null
+  condicaoArmazenamento: EstoqueCondicaoArmazenamento
+  prazoValidade: number | null
+  unidadeValidade: UnidadeValidade | null
+  fichaProducaoId: string | null
+}): Promise<EstoqueItemRow> {
+  const { data, error } = await supabase
     .from('estoque_itens')
-    .insert({ categoria, title: title.trim(), quantidade: 0, unidade, produto_categoria: produtoCategoria, subcategoria })
+    .insert({
+      categoria: input.categoria,
+      title: input.title.trim(),
+      quantidade: 0,
+      unidade: input.unidade,
+      produto_categoria: input.produtoCategoria,
+      subcategoria: input.subcategoria,
+      tipo_produto: input.tipoProduto,
+      marca: input.marca,
+      volume_padrao: input.volumePadrao,
+      condicao_armazenamento: input.condicaoArmazenamento,
+      prazo_validade: input.prazoValidade,
+      unidade_validade: input.unidadeValidade,
+      ficha_producao_id: input.fichaProducaoId,
+    })
     .select('*')
     .single()
-  if (insertError) throw insertError
-  return created as EstoqueItemRow
+  if (error) {
+    if (error.code === '23505') throw new Error('Já existe um produto com esse nome cadastrado neste setor.')
+    throw error
+  }
+  return data as EstoqueItemRow
 }
+
+// Nota: existiu aqui um findOrCreateEstoqueItem() usado pela aba "Entrada no
+// Estoque" pra criar produto na hora, digitando o nome livre. Removido
+// quando Entrada passou a exigir produto já cadastrado (ver
+// EstoqueCadastrarProdutoTab/criarProdutoEstoque acima) — pedido do usuário
+// pra centralizar o cadastro num único lugar.

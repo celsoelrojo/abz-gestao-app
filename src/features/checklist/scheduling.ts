@@ -18,7 +18,14 @@ function isLastWeekOfMonth(date: Date): boolean {
   return nextOccurrence.getMonth() !== date.getMonth()
 }
 
-function matchesSemanaDoMes(task: ChecklistTaskRow, date: Date): boolean {
+// Só os campos de agenda importam pra essa lógica — Pick em vez de
+// ChecklistTaskRow inteiro, pra também aceitar o recorte mínimo devolvido
+// por checklist_agenda_todos_setores() (usado no resumo do dia da Home, que
+// precisa somar tarefas de todos os setores sem expor título/descrição/
+// responsável de setores que a RLS normalmente esconde).
+type TarefaAgendavel = Pick<ChecklistTaskRow, 'active' | 'periodicidade' | 'data_unica' | 'dias' | 'semanas_do_mes'>
+
+function matchesSemanaDoMes(task: TarefaAgendavel, date: Date): boolean {
   if (!task.semanas_do_mes.length) return true
   const w = String(weekOfMonth(date))
   if (task.semanas_do_mes.includes(w)) return true
@@ -31,7 +38,7 @@ function matchesSemanaDoMes(task: ChecklistTaskRow, date: Date): boolean {
 // (Diária/"A cada turno" só funcionam porque a tarefa é criada com os 7 dias
 // marcados — ver migration 0015, que corrige o seed antigo); Mensal/Quinzenal
 // checam adicionalmente `semanas_do_mes`.
-export function isTaskScheduledOn(task: ChecklistTaskRow, date: Date): boolean {
+export function isTaskScheduledOn(task: TarefaAgendavel, date: Date): boolean {
   if (!task.active) return false
   if (task.periodicidade === 'Única') return task.data_unica === isoDate(date)
   const weekday = weekdayNameForDate(date) as Weekday

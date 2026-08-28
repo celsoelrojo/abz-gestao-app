@@ -79,6 +79,25 @@ export type ChecklistConclusaoRow = {
   created_at: string
 }
 
+// Recorte mínimo de checklist_tasks (só campos de agenda, sem título/
+// descrição/responsável) devolvido por checklist_agenda_todos_setores() —
+// usado pra montar a barra "tarefas gerais do estabelecimento" na Home, que
+// precisa somar todos os setores mesmo a RLS de checklist_tasks só deixando
+// cada perfil ver o próprio.
+export type ChecklistAgendaRow = {
+  id: number
+  setor: Setor
+  periodicidade: Periodicidade
+  dias: Weekday[]
+  data_unica: string | null
+  semanas_do_mes: string[]
+}
+
+export type ChecklistConcluidaRow = {
+  task_id: number
+  setor: Setor
+}
+
 export type PrinterRow = {
   id: string
   nome: string
@@ -395,6 +414,8 @@ export type EstoqueCategoria = 'Bar' | 'Cozinha' | 'Salão' | 'Material de Limpe
 export type EstoqueUnidade = 'Caixa' | 'Unidade' | 'Quilo' | 'Litro' | 'Grama' | 'Mililitro' | 'Pacote' | 'Fardo'
 export type MotivoRetirada = 'Produção' | 'Uso interno' | 'Perda' | 'Vencimento' | 'Quebra' | 'Transferência' | 'Outro'
 export type EstoqueMovimentoTipo = 'Entrada Manual' | 'Entrada por Produção' | 'Saída de Estoque' | 'Estorno de Retirada'
+export type EstoqueTipoProduto = 'Matéria Prima' | 'Remanufaturado' | 'Pronto para Venda'
+export type EstoqueCondicaoArmazenamento = 'Ambiente' | 'Refrigerado' | 'Congelado'
 
 export type EstoqueItemRow = {
   id: string
@@ -408,6 +429,13 @@ export type EstoqueItemRow = {
   medio: number | null
   max: number | null
   validade: string | null
+  tipo_produto: EstoqueTipoProduto
+  marca: string | null
+  volume_padrao: number | null
+  condicao_armazenamento: EstoqueCondicaoArmazenamento | null
+  prazo_validade: number | null
+  unidade_validade: UnidadeValidade | null
+  ficha_producao_id: string | null
   created_at: string
   updated_at: string
 }
@@ -606,6 +634,14 @@ export type Database = {
       reverter_producao_checklist: {
         Args: { p_lote_id: string | null; p_movimento_id: string }
         Returns: undefined
+      }
+      checklist_agenda_todos_setores: {
+        Args: Record<string, never>
+        Returns: ChecklistAgendaRow[]
+      }
+      checklist_concluidas_em: {
+        Args: { p_data: string }
+        Returns: ChecklistConcluidaRow[]
       }
     }
     Enums: Record<string, never>

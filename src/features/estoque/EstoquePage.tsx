@@ -3,15 +3,23 @@ import { isManager, useAuthStore } from '../../store/authStore'
 import { Icon, type IconName } from '../../components/Icon'
 import { useEstoqueRealtime } from './useEstoque'
 import { EstoqueAtualTab } from './EstoqueAtualTab'
+import { EstoqueCadastrarProdutoTab } from './EstoqueCadastrarProdutoTab'
 import { EstoqueEntradaTab } from './EstoqueEntradaTab'
 import { EstoqueRetiradaTab } from './EstoqueRetiradaTab'
 import { EstoqueLimitesTab } from './EstoqueLimitesTab'
 import { EstoqueComprasTab } from './EstoqueComprasTab'
 
-type EstoqueTab = 'hub' | 'atual' | 'entrada' | 'retirada' | 'limites' | 'compras'
+type EstoqueTab = 'hub' | 'atual' | 'cadastrar' | 'entrada' | 'retirada' | 'limites' | 'compras'
 
 const SUBMENU: { key: EstoqueTab; title: string; desc: string; icon: IconName; managerOnly: boolean }[] = [
   { key: 'atual', title: 'Estoque', desc: 'Saldo por categoria', icon: 'estoque-atual', managerOnly: false },
+  {
+    key: 'cadastrar',
+    title: 'Cadastrar Produto',
+    desc: 'Base do produto: tipo, marca, categoria, validade',
+    icon: 'estoque-cadastrar',
+    managerOnly: false,
+  },
   { key: 'entrada', title: 'Entrada no Estoque', desc: 'Cadastrar produto e registrar entrada', icon: 'estoque-entrada', managerOnly: false },
   { key: 'retirada', title: 'Retirada do Estoque', desc: 'Registrar saída de itens', icon: 'estoque-retirada', managerOnly: true },
   { key: 'limites', title: 'Estoque Mínimo e Máximo', desc: 'Configurar limites', icon: 'estoque-limites', managerOnly: true },
@@ -59,7 +67,8 @@ export function EstoquePage() {
       )}
 
       {activeTab === 'atual' && <EstoqueAtualTab />}
-      {activeTab === 'entrada' && <EstoqueEntradaTab />}
+      {activeTab === 'cadastrar' && <EstoqueCadastrarProdutoTab />}
+      {activeTab === 'entrada' && <EstoqueEntradaTab onIrParaCadastro={() => setTab('cadastrar')} />}
       {activeTab === 'retirada' && <EstoqueRetiradaTab />}
       {activeTab === 'limites' && <EstoqueLimitesTab />}
       {activeTab === 'compras' && <EstoqueComprasTab />}

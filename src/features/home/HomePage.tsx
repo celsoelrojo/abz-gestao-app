@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useAuthStore, isManager } from '../../store/authStore'
 import { Icon, type IconName } from '../../components/Icon'
+import { useChecklistRealtime } from '../checklist/useChecklistTasks'
 import { MensagensImportantesPanel } from '../mensagens/MensagensImportantesPanel'
+import { TarefasProgressoCard } from './TarefasProgressoCard'
+import { useChecklistResumoDia } from './useChecklistResumoDia'
 
 // Migração incremental e honesta: só os módulos com equivalente real no
 // Supabase (Checklist, Contas, Impressão) ficam clicáveis aqui. O resto
@@ -50,9 +53,24 @@ export function HomePage() {
   const salaoAccess = isAdmin || profile?.setor === 'Salão'
   const barCozinhaAccess = isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha'
 
+  useChecklistRealtime()
+  const { data: resumoDia } = useChecklistResumoDia()
+
   return (
     <div className="container">
       <MensagensImportantesPanel />
+
+      {resumoDia && (
+        <div className="home-progress-row">
+          <TarefasProgressoCard titulo="Tarefas do dia — Geral" resumo={resumoDia.geral} mostrarFraseIncentivo />
+          {profile?.setor && (
+            <TarefasProgressoCard
+              titulo={`Tarefas do dia — ${profile.setor}`}
+              resumo={resumoDia.porSetor[profile.setor]}
+            />
+          )}
+        </div>
+      )}
 
       <h3 className="section-label">Módulos</h3>
       <div className="modules-grid">

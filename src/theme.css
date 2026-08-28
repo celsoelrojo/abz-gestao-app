@@ -197,6 +197,15 @@ input, textarea, select { font-family: inherit; }
   font-size: 0.85rem;
 }
 
+.form-success {
+  color: #9bd6a4;
+  background: var(--success-soft);
+  border: 1px solid rgba(92,174,106,0.35);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
 .demo-divider {
   display: flex; align-items: center; gap: 12px;
   margin: 24px 0 16px;
@@ -393,7 +402,7 @@ input, textarea, select { font-family: inherit; }
 }
 .progress-info { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .progress-info strong { font-size: 0.95rem; }
-#progress-percent { color: var(--gold-bright); font-weight: 700; }
+#progress-percent, .progress-percent { color: var(--gold-bright); font-weight: 700; }
 .progress-bar-track {
   height: 10px; background: var(--bg-input); border-radius: 20px; overflow: hidden;
   border: 1px solid var(--border);
@@ -404,6 +413,14 @@ input, textarea, select { font-family: inherit; }
   width: 0%;
   transition: width 0.3s ease;
   border-radius: 20px;
+}
+.progress-incentivo {
+  margin: 10px 0 0; font-size: 0.84rem; font-style: italic; color: var(--gold-bright);
+}
+.home-progress-row { display: flex; flex-direction: column; }
+@media (min-width: 640px) {
+  .home-progress-row { flex-direction: row; gap: 18px; }
+  .home-progress-row .progress-card { flex: 1; margin-bottom: 28px; }
 }
 
 .checklist-categories { display: flex; flex-direction: column; gap: 22px; }

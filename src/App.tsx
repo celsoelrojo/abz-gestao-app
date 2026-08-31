@@ -1,7 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { useAuthStore } from './store/authStore'
+import { isFreelancer, useAuthStore } from './store/authStore'
 import { useSessionSync } from './features/auth/useSession'
 import { LoginPage } from './features/auth/LoginPage'
+import { ConfirmModal } from './components/ConfirmModal'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { TopBar } from './components/TopBar'
 import { ChecklistPage } from './features/checklist/ChecklistPage'
@@ -15,6 +16,7 @@ import { MapasPage } from './features/mapas/MapasPage'
 import { FreelancerPage } from './features/freelancer/FreelancerPage'
 import { PopsPage } from './features/pops/PopsPage'
 import { AuditoriaPage } from './features/auditoria/AuditoriaPage'
+import { SobreNosPage } from './features/sobrenos/SobreNosPage'
 import { HomePage } from './features/home/HomePage'
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -31,8 +33,16 @@ export default function App() {
   const session = useAuthStore((s) => s.session)
   const profile = useAuthStore((s) => s.profile)
   const isAdmin = profile?.role === 'administrador'
+  // Perfil freelancer é restrito por padrão a Checklist + Sobre nós (Home
+  // dedicada, ver FreelancerHomePage) — pedido do usuário foi "nada de
+  // Estoque, Fichas, Mapas...". As rotas abaixo cobrem a navegação direta
+  // por URL; a RLS dessas tabelas ainda enxerga pelo `setor` (não pelo
+  // `role`), então isto aqui NÃO é a barreira de segurança de verdade pra
+  // quem chamar a API direto — só a UI. Ver nota no resumo desta sessão.
+  const freelancer = isFreelancer(profile)
 
   return (
+    <>
     <Routes>
       {/* Login bem-sucedido só atualiza o estado (session) — sem este
           redirecionamento, quem ficasse na URL /login nunca saía de lá
@@ -70,9 +80,7 @@ export default function App() {
         path="/estoque"
         element={
           <ProtectedRoute>
-            <Shell>
-              <EstoquePage />
-            </Shell>
+            <Shell>{!freelancer ? <EstoquePage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />
@@ -80,7 +88,7 @@ export default function App() {
         path="/reservas"
         element={
           <ProtectedRoute>
-            <Shell>{isAdmin || profile?.setor === 'Salão' ? <ReservasPage /> : <Navigate to="/" replace />}</Shell>
+            <Shell>{(isAdmin || profile?.setor === 'Salão') && !freelancer ? <ReservasPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />
@@ -89,7 +97,7 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shell>
-              {isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha' ? (
+              {(isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha') && !freelancer ? (
                 <FichasTecnicasPage />
               ) : (
                 <Navigate to="/" replace />
@@ -103,7 +111,7 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shell>
-              {isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha' ? (
+              {(isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha') && !freelancer ? (
                 <FichasProducaoPage />
               ) : (
                 <Navigate to="/" replace />
@@ -116,9 +124,7 @@ export default function App() {
         path="/mapas"
         element={
           <ProtectedRoute>
-            <Shell>
-              <MapasPage />
-            </Shell>
+            <Shell>{!freelancer ? <MapasPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />
@@ -134,9 +140,7 @@ export default function App() {
         path="/pops"
         element={
           <ProtectedRoute>
-            <Shell>
-              <PopsPage />
-            </Shell>
+            <Shell>{!freelancer ? <PopsPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />
@@ -145,6 +149,16 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shell>{isAdmin ? <AuditoriaPage /> : <Navigate to="/" replace />}</Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sobre-nos"
+        element={
+          <ProtectedRoute>
+            <Shell>
+              <SobreNosPage />
+            </Shell>
           </ProtectedRoute>
         }
       />
@@ -160,5 +174,7 @@ export default function App() {
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    <ConfirmModal />
+    </>
   )
 }

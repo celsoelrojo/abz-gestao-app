@@ -691,6 +691,55 @@ input, textarea, select { font-family: inherit; }
 .icon-btn:hover { border-color: var(--gold-dark); color: var(--gold-bright); }
 .icon-btn.danger:hover { border-color: var(--danger); color: #f2a89e; background: var(--danger-soft); }
 
+/* ============ Sobre nós: editor de texto rico mínimo ============ */
+.rich-text-editor { display: flex; flex-direction: column; gap: 0; }
+.rich-text-toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.rich-text-btn {
+  width: 32px; height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.92rem;
+  transition: all 0.15s ease;
+}
+.rich-text-btn:hover { border-color: var(--gold-dark); color: var(--gold-bright); }
+.rich-text-size {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  margin-left: 4px;
+}
+.rich-text-body {
+  min-height: 220px;
+  padding: 14px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.rich-text-body:focus { outline: none; border-color: var(--gold-dark); }
+.rich-text-body.rich-text-readonly {
+  border-radius: var(--radius-sm);
+  min-height: 0;
+}
+.rich-text-body p { margin: 0 0 10px; }
+.rich-text-body p:last-child { margin-bottom: 0; }
+
 .empty-state { text-align: center; color: var(--text-muted); padding: 24px; font-size: 0.88rem; }
 
 /* ============ Conteúdo setorial genérico (Mapas, POP's, Fichas, Estoque) ============ */

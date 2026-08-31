@@ -38,7 +38,7 @@ export function EstoqueAtualTab() {
         </select>
       </div>
 
-      <EstoqueItemList itens={itensFiltrados} showSetor={filtro === 'Todos'} />
+      <EstoqueItemList itens={itensFiltrados} showSetor={filtro === 'Todos'} podeAjustar={admin} />
     </div>
   )
 }

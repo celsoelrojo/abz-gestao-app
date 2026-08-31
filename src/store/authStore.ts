@@ -42,3 +42,7 @@ export function isManager(profile: ProfileRow | null, targetSetor?: string | nul
   if (isSetorManager(profile)) return !targetSetor || profile?.setor === targetSetor
   return false
 }
+
+export function isFreelancer(profile: ProfileRow | null): boolean {
+  return profile?.role === 'freelancer'
+}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { supabase } from '../../lib/supabaseClient'
 import { POP_SETORES, type PopSetor } from './popConstants'
 import { POPS_KEY, usePopCategories, usePops, usePopsRealtime } from './usePops'
@@ -87,7 +88,7 @@ export function PopsPage() {
   }
 
   async function excluir(p: PopRow) {
-    if (!window.confirm(`Excluir o POP "${p.titulo}"? Esta ação não pode ser desfeita.`)) return
+    if (!(await confirmar(`Excluir o POP "${p.titulo}"? Esta ação não pode ser desfeita.`))) return
     const { error } = await supabase.from('pops').delete().eq('id', p.id)
     if (error) {
       window.alert(error.message)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useEstoqueItens } from '../estoque/useEstoque'
 import { calcFichaCustos, calcIngredienteCustoTotal, calcIngredienteCustoUnitario } from './fichaHelpers'
 import { fichaImagemUrl } from './fichaStorage'
 import type { FichaTecnicaRow, FichaTecnicaSemCustoRow } from '../../types/database'
@@ -6,6 +7,7 @@ import type { FichaTecnicaRow, FichaTecnicaSemCustoRow } from '../../types/datab
 type FichaLike = FichaTecnicaRow | FichaTecnicaSemCustoRow
 
 export function FichaTecnicaDetailModal({ ficha, onClose }: { ficha: FichaLike; onClose: () => void }) {
+  const { data: estoqueItens } = useEstoqueItens()
   const temCusto = 'preco_sugerido' in ficha
   const custos = temCusto
     ? calcFichaCustos((ficha as FichaTecnicaRow).ingredientes, (ficha as FichaTecnicaRow).embalagem, (ficha as FichaTecnicaRow).preco_sugerido)
@@ -46,25 +48,28 @@ export function FichaTecnicaDetailModal({ ficha, onClose }: { ficha: FichaLike; 
 
           <h4 className="section-label">Ingredientes</h4>
           <div className="manage-list">
-            {ficha.ingredientes.map((ing) => (
-              <div className="manage-row" key={ing.id}>
-                <div className="manage-row-info">
-                  <strong>{ing.nome || '(sem nome)'}</strong>
-                  <span>
-                    Bruta: {ing.qtdBruta ?? '—'} {ing.unidade} · Líquida: {ing.qtdLiquida ?? '—'} · Fator correção:{' '}
-                    {ing.fatorCorrecao ?? '—'}
-                    {temCusto && 'qtdBase' in ing && (
-                      <>
-                        {' '}
-                        · Custo total: R${' '}
-                        {calcIngredienteCustoTotal(ing as FichaTecnicaRow['ingredientes'][number]).toFixed(2)} (unit. R${' '}
-                        {calcIngredienteCustoUnitario(ing as FichaTecnicaRow['ingredientes'][number]).toFixed(4)})
-                      </>
-                    )}
-                  </span>
+            {ficha.ingredientes.map((ing) => {
+              const item = (estoqueItens ?? []).find((it) => it.id === ing.estoqueItemId)
+              return (
+                <div className="manage-row" key={ing.id}>
+                  <div className="manage-row-info">
+                    <strong>{item?.title ?? '(produto não encontrado)'}</strong>
+                    <span>
+                      Bruta: {ing.qtdBruta ?? '—'} {item?.unidade ?? ''} · Líquida: {ing.qtdLiquida ?? '—'} · Fator correção:{' '}
+                      {ing.fatorCorrecao ?? '—'}
+                      {temCusto && 'qtdBase' in ing && (
+                        <>
+                          {' '}
+                          · Custo total: R${' '}
+                          {calcIngredienteCustoTotal(ing as FichaTecnicaRow['ingredientes'][number]).toFixed(2)} (unit. R${' '}
+                          {calcIngredienteCustoUnitario(ing as FichaTecnicaRow['ingredientes'][number]).toFixed(4)})
+                        </>
+                      )}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {ficha.ingredientes.length === 0 && <div className="empty-state">Nenhum ingrediente cadastrado.</div>}
           </div>
 
@@ -93,16 +98,16 @@ export function FichaTecnicaDetailModal({ ficha, onClose }: { ficha: FichaLike; 
           </div>
 
           <div className="field-row" style={{ marginTop: 12 }}>
-            {ficha.utensilios && (
+            {(ficha.utensilios || ficha.equipamentos) && (
               <div className="field">
-                <label>Utensílios</label>
-                <p>{ficha.utensilios}</p>
+                <label>Utensílios e Equipamentos</label>
+                <p>{[ficha.utensilios, ficha.equipamentos].filter(Boolean).join(' / ')}</p>
               </div>
             )}
-            {ficha.equipamentos && (
+            {ficha.tempo_preparo && (
               <div className="field">
-                <label>Equipamentos</label>
-                <p>{ficha.equipamentos}</p>
+                <label>Tempo de preparo</label>
+                <p>{ficha.tempo_preparo}</p>
               </div>
             )}
           </div>
@@ -112,16 +117,10 @@ export function FichaTecnicaDetailModal({ ficha, onClose }: { ficha: FichaLike; 
               <p>{ficha.padrao_apresentacao}</p>
             </div>
           )}
-          {ficha.tempo_preparo && (
+          {ficha.boas_praticas && (
             <div className="field">
-              <label>Tempo de preparo</label>
-              <p>{ficha.tempo_preparo}</p>
-            </div>
-          )}
-          {ficha.alergenicos && (
-            <div className="field">
-              <label>Alergênicos</label>
-              <p>{ficha.alergenicos}</p>
+              <label>Boas práticas</label>
+              <p>{ficha.boas_praticas}</p>
             </div>
           )}
           {ficha.observacoes_gerais && (

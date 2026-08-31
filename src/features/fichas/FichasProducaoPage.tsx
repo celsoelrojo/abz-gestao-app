@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { supabase } from '../../lib/supabaseClient'
 import { FICHA_SETORES } from './fichaConstants'
 import { FICHAS_PRODUCAO_KEY, useFichasProducao, useFichasProducaoRealtime } from './useFichasProducao'
@@ -78,7 +79,7 @@ export function FichasProducaoPage() {
   }
 
   async function excluir(f: FichaProducaoRow) {
-    if (!window.confirm(`Excluir a ficha de produção "${f.nome}"? Esta ação não pode ser desfeita.`)) return
+    if (!(await confirmar(`Excluir a ficha de produção "${f.nome}"? Esta ação não pode ser desfeita.`))) return
     const { error } = await supabase.from('fichas_producao').delete().eq('id', f.id)
     if (error) {
       window.alert(error.message)

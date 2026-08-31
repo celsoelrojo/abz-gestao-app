@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabaseClient'
+import { confirmar } from '../../store/confirmStore'
 import { POP_CATEGORIES_KEY, POPS_KEY, usePopCategories, usePops } from './usePops'
 import type { PopCategoryRow } from '../../types/database'
 
@@ -62,7 +63,7 @@ export function ManagePopCategoriesModal({ onClose }: { onClose: () => void }) {
     await queryClient.invalidateQueries({ queryKey: POPS_KEY })
   }
 
-  function requestDelete(c: PopCategoryRow) {
+  async function requestDelete(c: PopCategoryRow) {
     if ((categories ?? []).length <= 1) {
       window.alert('Não é possível excluir a última categoria.')
       return
@@ -72,7 +73,7 @@ export function ManagePopCategoriesModal({ onClose }: { onClose: () => void }) {
       setReassigning(c)
       return
     }
-    if (!window.confirm(`Excluir a categoria "${c.name}"?`)) return
+    if (!(await confirmar(`Excluir a categoria "${c.name}"?`))) return
     supabase
       .from('pop_categories')
       .delete()

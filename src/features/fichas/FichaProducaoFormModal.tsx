@@ -3,6 +3,7 @@ import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabaseClient'
 import { isoDate } from '../../lib/date'
 import { useVinculoOptions, VINCULO_TIPOS, type VinculoTipo } from '../../lib/vinculo'
+import { confirmar } from '../../store/confirmStore'
 import { useEstoqueItens } from '../estoque/useEstoque'
 import { FICHA_PRODUCAO_CATEGORIAS, FICHA_SETORES, PRODUCAO_CONDICOES_ARMAZENAMENTO, PRODUCAO_UNIDADES_RENDIMENTO } from './fichaConstants'
 import { calcProducaoFichaCustoTotal, calcProducaoIngredienteCustoTotal } from './fichaHelpers'
@@ -108,7 +109,7 @@ export function FichaProducaoFormModal({
 
   async function handleExcluirFoto() {
     if (!fotoPrincipalUrl) return
-    if (!window.confirm('Excluir a foto principal desta ficha?')) return
+    if (!(await confirmar('Excluir a foto principal desta ficha?'))) return
     try {
       await deleteFichaImagem(fotoPrincipalUrl)
     } catch {

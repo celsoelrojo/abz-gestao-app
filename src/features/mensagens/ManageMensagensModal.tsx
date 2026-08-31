@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isSetorManager, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { supabase } from '../../lib/supabaseClient'
 import { MENSAGENS_KEY, useMensagens } from './useMensagens'
 import type { MensagemDestino, MensagemRow } from '../../types/database'
@@ -29,7 +30,7 @@ export function ManageMensagensModal({ onClose }: { onClose: () => void }) {
   }
 
   async function handleDelete(m: MensagemRow) {
-    if (!window.confirm('Excluir esta mensagem? Esta ação não pode ser desfeita.')) return
+    if (!(await confirmar('Excluir esta mensagem? Esta ação não pode ser desfeita.'))) return
     const { error } = await supabase.from('mensagens').delete().eq('id', m.id)
     if (error) {
       window.alert(error.message)

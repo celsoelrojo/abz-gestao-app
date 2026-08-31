@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { useAuthStore, isManager } from '../../store/authStore'
+import { isFreelancer, isManager, useAuthStore } from '../../store/authStore'
 import { Icon, type IconName } from '../../components/Icon'
 import { useChecklistRealtime } from '../checklist/useChecklistTasks'
+import { FreelancerHomePage } from '../freelancer/FreelancerHomePage'
 import { MensagensImportantesPanel } from '../mensagens/MensagensImportantesPanel'
 import { TarefasProgressoCard } from './TarefasProgressoCard'
 import { useChecklistResumoDia } from './useChecklistResumoDia'
@@ -42,6 +43,7 @@ const MIGRATED_MODULES: { key: string; to: string; title: string; desc: string; 
   { key: 'contas', to: '/contas', title: 'Gerenciar Contas', desc: 'Usuários e acessos', icon: 'accounts', roles: 'admin' },
   { key: 'impressao', to: '/impressao', title: 'Configuração de Impressora', desc: 'Etiquetas de produção', icon: 'gear', roles: 'manager' },
   { key: 'auditoria', to: '/auditoria', title: 'Histórico de Auditoria', desc: 'Quem alterou o quê e quando', icon: 'auditoria', roles: 'admin' },
+  { key: 'sobre-nos', to: '/sobre-nos', title: 'Sobre nós', desc: 'História, cultura e cargos', icon: 'sobre-nos', roles: 'todos' },
 ]
 
 const PENDING_MODULES: string[] = []
@@ -55,6 +57,10 @@ export function HomePage() {
 
   useChecklistRealtime()
   const { data: resumoDia } = useChecklistResumoDia()
+
+  // Perfil freelancer tem uma Home própria (só a própria escala + Checklist
+  // + Sobre nós) em vez do painel de Módulos completo — pedido do usuário.
+  if (isFreelancer(profile)) return <FreelancerHomePage />
 
   return (
     <div className="container">

@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { supabase } from '../../lib/supabaseClient'
 import { toggleSemanaDoMes, toggleValue } from './taskFormHelpers'
 import { CHECKLIST_TASKS_ALL_KEY, CHECKLIST_TASKS_KEY, useAllChecklistTasksForManage } from './useChecklistTasks'
@@ -62,7 +63,7 @@ export function ManageChecklistModal({ onClose }: { onClose: () => void }) {
   }
 
   async function deleteTask(task: ChecklistTaskRow) {
-    if (!window.confirm(`Excluir a tarefa "${task.title}"? Esta ação não pode ser desfeita.`)) return
+    if (!(await confirmar(`Excluir a tarefa "${task.title}"? Esta ação não pode ser desfeita.`))) return
     const { error } = await supabase.from('checklist_tasks').delete().eq('id', task.id)
     if (error) {
       window.alert(error.message)

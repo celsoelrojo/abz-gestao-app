@@ -59,6 +59,7 @@ export function FreelancerCadastroTab() {
                     {f.funcao} · {f.telefone}
                     {!f.email ? '' : ` · ${f.email}`}
                     {f.status === 'inativo' ? ' · inativo' : ''}
+                    {f.profile_id ? ' · 🔑 tem conta de login' : ''}
                   </span>
                 </div>
                 <div className="manage-row-actions">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { supabase } from '../../lib/supabaseClient'
 import { MAPA_BLOCKS_KEY, useMapaBlocks } from './useMapas'
 import { mapaImagemUrl } from './mapaStorage'
@@ -32,7 +33,7 @@ export function MapaDetailModal({ mapa, onClose }: { mapa: MapaFluxogramaRow; on
   }
 
   async function deleteBlock(block: MapaBlockRow) {
-    if (!window.confirm('Excluir este bloco? Esta ação não pode ser desfeita.')) return
+    if (!(await confirmar('Excluir este bloco? Esta ação não pode ser desfeita.'))) return
     const { error } = await supabase.from('mapa_blocks').delete().eq('id', block.id)
     if (error) {
       window.alert(error.message)

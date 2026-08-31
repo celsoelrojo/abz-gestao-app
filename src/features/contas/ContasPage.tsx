@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabaseClient'
+import { FREELANCERS_KEY, useFreelancers } from '../freelancer/useFreelancers'
 import type { AuditLogRow, ProfileRow, Setor, UserRole } from '../../types/database'
 import { summarizeProfileAudit } from './auditSummary'
 
@@ -12,6 +13,7 @@ const ROLE_OPTIONS: { value: UserRole; label: string; needsSetor: boolean }[] = 
   { value: 'bar', label: 'Bartender', needsSetor: true },
   { value: 'cozinha', label: 'Cozinheiro', needsSetor: true },
   { value: 'salao', label: 'Atendente', needsSetor: true },
+  { value: 'freelancer', label: 'Freelancer', needsSetor: true },
 ]
 const ROLE_LABELS: Record<UserRole, string> = Object.fromEntries(ROLE_OPTIONS.map((r) => [r.value, r.label])) as Record<
   UserRole,
@@ -43,6 +45,7 @@ export function ContasPage() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<UserRole>('bar')
   const [setor, setSetor] = useState<Setor>('Bar')
+  const [freelancerId, setFreelancerId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -52,22 +55,47 @@ export function ContasPage() {
 
   const needsSetor = needsSetorFor(role)
 
+  // Pedido do usuário: perfil de login pra freelancers. O cadastro em si (o
+  // funcionário Freelancer > Cadastro de Freelancer) já existe sem conta —
+  // aqui, ao criar a conta, o Administrador pode ligar essa conta a um
+  // cadastro já existente (só os que ainda não têm conta vinculada, do
+  // mesmo setor escolhido). Ligar é opcional: sem isso a conta funciona,
+  // só que "Minha Escala" fica vazia até alguém vincular depois.
+  const { data: freelancers } = useFreelancers()
+  const freelancersDisponiveis = useMemo(
+    () => (freelancers ?? []).filter((f) => f.setor === setor && !f.profile_id && f.status === 'ativo'),
+    [freelancers, setor],
+  )
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
     try {
-      const { error: fnError } = await supabase.functions.invoke('manage-user', {
+      const { data: created, error: fnError } = await supabase.functions.invoke('manage-user', {
         body: { action: 'create', nome, username, password, role, setor: needsSetor ? setor : null },
       })
       if (fnError) {
         setError(fnError.message)
         return
       }
+      if (role === 'freelancer' && freelancerId && created?.id) {
+        const { error: linkError } = await supabase.from('freelancers').update({ profile_id: created.id }).eq('id', freelancerId)
+        if (linkError) {
+          // A conta já foi criada com sucesso — só a ligação falhou (ex.: o
+          // cadastro foi vinculado por outro admin entre a busca e o clique
+          // aqui). Avisa mas não desfaz a conta criada.
+          setError(`Conta criada, mas não consegui vincular ao cadastro de freelancer: ${linkError.message}`)
+          await queryClient.invalidateQueries({ queryKey: FREELANCERS_KEY })
+          return
+        }
+        await queryClient.invalidateQueries({ queryKey: FREELANCERS_KEY })
+      }
       setShowForm(false)
       setNome('')
       setUsername('')
       setPassword('')
+      setFreelancerId('')
       await queryClient.invalidateQueries({ queryKey: ['profiles'] })
     } finally {
       setSubmitting(false)
@@ -108,7 +136,13 @@ export function ContasPage() {
           </div>
           <div className="field">
             <label>Perfil *</label>
-            <select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+            <select
+              value={role}
+              onChange={(e) => {
+                setRole(e.target.value as UserRole)
+                setFreelancerId('')
+              }}
+            >
               {ROLE_OPTIONS.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
@@ -119,13 +153,37 @@ export function ContasPage() {
           {needsSetor && (
             <div className="field">
               <label>Setor *</label>
-              <select value={setor} onChange={(e) => setSetor(e.target.value as Setor)}>
+              <select
+                value={setor}
+                onChange={(e) => {
+                  setSetor(e.target.value as Setor)
+                  setFreelancerId('')
+                }}
+              >
                 {SETORES.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+          {role === 'freelancer' && (
+            <div className="field">
+              <label>Vincular a um cadastro de freelancer</label>
+              <select value={freelancerId} onChange={(e) => setFreelancerId(e.target.value)}>
+                <option value="">Nenhum (vincular depois)</option>
+                {freelancersDisponiveis.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome} · {f.funcao}
+                  </option>
+                ))}
+              </select>
+              <span className="field-hint">
+                {freelancersDisponiveis.length === 0
+                  ? `Nenhum freelancer ativo em ${setor} sem conta ainda. Pode cadastrar em Freelancer > Cadastro e vincular depois editando esta conta.`
+                  : 'Sem isso, a conta funciona normalmente, mas "Minha Escala" fica vazia até vincular.'}
+              </span>
             </div>
           )}
           {error && <p className="login-error">{error}</p>}
@@ -193,6 +251,19 @@ function EditAccountModal({ conta, onClose }: { conta: ProfileRow; onClose: () =
   const [submitting, setSubmitting] = useState(false)
   const needsSetor = needsSetorFor(role)
 
+  // Mesmo vínculo opcional conta↔cadastro-de-freelancer do formulário de
+  // criação, aqui pra quem pulou na criação (ou quer trocar/desvincular).
+  const { data: freelancers } = useFreelancers()
+  const freelancerAtual = useMemo(() => (freelancers ?? []).find((f) => f.profile_id === conta.id), [freelancers, conta.id])
+  const [freelancerId, setFreelancerId] = useState(freelancerAtual?.id ?? '')
+  const freelancersDisponiveis = useMemo(
+    () =>
+      (freelancers ?? []).filter(
+        (f) => f.setor === setor && (!f.profile_id || f.id === freelancerAtual?.id) && f.status === 'ativo',
+      ),
+    [freelancers, setor, freelancerAtual],
+  )
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -207,6 +278,21 @@ function EditAccountModal({ conta, onClose }: { conta: ProfileRow; onClose: () =
       if (updateError) {
         setError(updateError.message)
         return
+      }
+      const novoVinculoId = role === 'freelancer' ? freelancerId || null : null
+      if (novoVinculoId !== (freelancerAtual?.id ?? null)) {
+        if (freelancerAtual) {
+          await supabase.from('freelancers').update({ profile_id: null }).eq('id', freelancerAtual.id)
+        }
+        if (novoVinculoId) {
+          const { error: linkError } = await supabase.from('freelancers').update({ profile_id: conta.id }).eq('id', novoVinculoId)
+          if (linkError) {
+            setError(`Conta salva, mas não consegui vincular ao cadastro de freelancer: ${linkError.message}`)
+            await queryClient.invalidateQueries({ queryKey: FREELANCERS_KEY })
+            return
+          }
+        }
+        await queryClient.invalidateQueries({ queryKey: FREELANCERS_KEY })
       }
       await queryClient.invalidateQueries({ queryKey: ['profiles'] })
       onClose()
@@ -246,6 +332,19 @@ function EditAccountModal({ conta, onClose }: { conta: ProfileRow; onClose: () =
                 {SETORES.map((s) => (
                   <option key={s} value={s}>
                     {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {role === 'freelancer' && (
+            <div className="field">
+              <label>Vincular a um cadastro de freelancer</label>
+              <select value={freelancerId} onChange={(e) => setFreelancerId(e.target.value)}>
+                <option value="">Nenhum</option>
+                {freelancersDisponiveis.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome} · {f.funcao}
                   </option>
                 ))}
               </select>

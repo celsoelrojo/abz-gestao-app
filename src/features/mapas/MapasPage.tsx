@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { supabase } from '../../lib/supabaseClient'
 import { MAPAS_KEY, useMapasFluxogramas, useMapasRealtime } from './useMapas'
 import { MapaFormModal } from './MapaFormModal'
@@ -36,7 +37,7 @@ export function MapasPage() {
   }
 
   async function excluir(m: MapaFluxogramaRow) {
-    if (!window.confirm(`Excluir "${m.title}"? Todos os blocos junto serão apagados. Esta ação não pode ser desfeita.`)) return
+    if (!(await confirmar(`Excluir "${m.title}"? Todos os blocos junto serão apagados. Esta ação não pode ser desfeita.`))) return
     const { error } = await supabase.from('mapas_fluxogramas').delete().eq('id', m.id)
     if (error) {
       window.alert(error.message)

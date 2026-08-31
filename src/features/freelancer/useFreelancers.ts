@@ -30,6 +30,22 @@ export function useFreelancerEscalas() {
   })
 }
 
+// "Minha Escala" — usada só pelo perfil freelancer (RLS
+// freelancer_escalas_select_own, migration 0036, já filtra pra só a própria
+// escala; não precisa filtrar de novo no client). valor_pagamento vem junto
+// na resposta — a tela que exibe é que decide não mostrar (pedido do
+// usuário: freelancer não vê o próprio valor de pagamento).
+export function useMinhaEscala() {
+  return useQuery({
+    queryKey: ['minha_escala'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('freelancer_escalas').select('*').order('data')
+      if (error) throw error
+      return data as FreelancerEscalaRow[]
+    },
+  })
+}
+
 export function useFreelancersRealtime() {
   const queryClient = useQueryClient()
   useEffect(() => {

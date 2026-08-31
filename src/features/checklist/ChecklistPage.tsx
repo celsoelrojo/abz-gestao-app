@@ -1,17 +1,28 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { formatDateBR, formatWeekdayLong, isoDate, weekdayNameForDate } from '../../lib/date'
 import { supabase } from '../../lib/supabaseClient'
 import { toPrinterConfig } from '../../lib/printing/mappers'
 import { enqueuePrintJob } from '../../lib/printing/printQueue'
-import { ESTOQUE_UNIDADES_ENTRADA } from '../estoque/estoqueConstants'
+import { useEstoqueItens } from '../estoque/useEstoque'
+import { useFichasProducao } from '../fichas/useFichasProducao'
 import { findOverdueInfo, getUpcomingDays, getWeekDates, isTaskScheduledOn } from './scheduling'
 import { useChecklistConclusoesRange, useChecklistRealtime, useChecklistTasks } from './useChecklistTasks'
 import { checklistFotoUrl, completeTask, resolveJustificativaAtraso, uncompleteTask } from './completeTask'
 import type { CompleteTaskOptions } from './completeTask'
 import { ManageChecklistModal } from './ManageChecklistModal'
-import type { ChecklistConclusaoRow, ChecklistTaskRow, EstoqueUnidade, Setor } from '../../types/database'
+import { ProducaoConclusaoModal } from './ProducaoConclusaoModal'
+import type { IngredienteUsado } from './ProducaoConclusaoModal'
+import type {
+  ChecklistConclusaoRow,
+  ChecklistTaskRow,
+  FichaProducaoLoteRow,
+  FichaProducaoRow,
+  PrinterRow,
+  Setor,
+} from '../../types/database'
 
 const SETORES: Setor[] = ['Bar', 'Cozinha', 'Salão']
 
@@ -35,6 +46,12 @@ export function ChecklistPage() {
     upcomingEndIso,
   )
   useChecklistRealtime()
+  // Só pra montar a caixa de conclusão de tarefas "envolve produção" —
+  // precisa da ficha inteira (ingredientes, rendimento) e dos itens de
+  // estoque do setor pra sugerir/exibir nome+unidade de cada ingrediente.
+  const { data: fichasProducao } = useFichasProducao()
+  const { data: estoqueItensTodos } = useEstoqueItens()
+  const fichasProducaoById = useMemo(() => new Map((fichasProducao ?? []).map((f) => [f.id, f])), [fichasProducao])
 
   const [pendingAtraso, setPendingAtraso] = useState<{
     task: ChecklistTaskRow
@@ -53,6 +70,13 @@ export function ChecklistPage() {
     task: ChecklistTaskRow
     dateIso: string
     extra: CompleteTaskOptions
+    ficha: FichaProducaoRow
+  } | null>(null)
+  const [pendingEtiqueta, setPendingEtiqueta] = useState<{
+    printer: PrinterRow
+    producaoNome: string
+    condicaoArmazenamento: string | null
+    lote: FichaProducaoLoteRow
   } | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [manageOpen, setManageOpen] = useState(false)
@@ -165,7 +189,12 @@ export function ChecklistPage() {
     // não importa na prática, mas produção vem primeiro por ser o fluxo mais
     // específico.
     if (task.envolve_producao && !extra.producao) {
-      setPendingProducao({ task, dateIso, extra })
+      const ficha = task.producao_vinculada_id ? fichasProducaoById.get(task.producao_vinculada_id) : undefined
+      if (!ficha) {
+        window.alert('Ficha de produção vinculada não encontrada (ou ainda carregando). Tente novamente em instantes.')
+        return
+      }
+      setPendingProducao({ task, dateIso, extra, ficha })
       return
     }
     if (task.foto_obrigatoria && !extra.photoFile) {
@@ -179,6 +208,12 @@ export function ChecklistPage() {
       const result = await completeTask(task, dateIso, profile.id, extra)
       await refetchConclusoes()
       if (result.loteId) await offerLabelPrint(task, result.loteId)
+    } catch (err) {
+      // Sem isso, um erro do RPC (ex.: produto remanufaturado não cadastrado,
+      // saldo insuficiente de um ingrediente) ficava só como unhandled
+      // rejection no console — a tarefa simplesmente não marcava como
+      // concluída e nada acontecia no Estoque, sem nenhum aviso na tela.
+      window.alert(err instanceof Error ? err.message : 'Erro ao concluir a tarefa.')
     } finally {
       setBusyKey(null)
     }
@@ -186,6 +221,8 @@ export function ChecklistPage() {
 
   // Etiqueta é opcional e só oferecida se houver impressora ativa cadastrada
   // — sem isso, a produção continua registrada normalmente, só sem etiqueta.
+  // A quantidade agora é perguntada (caixa "Imprimir etiqueta"), não mais
+  // fixa em 1 — pedido do usuário.
   async function offerLabelPrint(task: ChecklistTaskRow, loteId: string) {
     if (!profile || !task.producao_vinculada_id) return
     const [{ data: printers }, { data: producao }, { data: lote }] = await Promise.all([
@@ -195,16 +232,22 @@ export function ChecklistPage() {
     ])
     const printer = printers?.[0]
     if (!printer || !producao || !lote) return
-    if (!window.confirm(`Adicionar etiqueta de "${producao.nome}" (lote ${lote.numero_lote}) à fila de impressão?`)) return
+    setPendingEtiqueta({ printer, producaoNome: producao.nome, condicaoArmazenamento: producao.condicao_armazenamento, lote })
+  }
+
+  async function handleEtiquetaConfirm(quantidadeEtiquetas: number) {
+    if (!pendingEtiqueta || !profile) return
+    const { printer, producaoNome, condicaoArmazenamento, lote } = pendingEtiqueta
+    setPendingEtiqueta(null)
     await enqueuePrintJob({
       printer: toPrinterConfig(printer),
-      lote_id: loteId,
-      quantidade_etiquetas: 1,
+      lote_id: lote.id,
+      quantidade_etiquetas: quantidadeEtiquetas,
       data: {
-        produto: producao.nome,
+        produto: producaoNome,
         preparo: new Date(lote.data_hora_producao).toLocaleString('pt-BR'),
         validade: lote.data_hora_validade ? new Date(lote.data_hora_validade).toLocaleString('pt-BR') : '—',
-        armazenar: producao.condicao_armazenamento ?? '—',
+        armazenar: condicaoArmazenamento ?? '—',
         responsavel: lote.responsavel,
         quantidade: lote.quantidade_produzida,
       },
@@ -213,11 +256,11 @@ export function ChecklistPage() {
     })
   }
 
-  function handleProducaoConfirm(quantidade: number, unidade: EstoqueUnidade) {
+  function handleProducaoConfirm(rendimento: number, ingredientes: IngredienteUsado[]) {
     if (!pendingProducao) return
     const { task, dateIso, extra } = pendingProducao
     setPendingProducao(null)
-    proceedToComplete(task, dateIso, { ...extra, producao: { quantidade, unidade } })
+    proceedToComplete(task, dateIso, { ...extra, producao: { rendimento, ingredientes } })
   }
 
   async function handleToggle(task: ChecklistTaskRow, dateIso: string) {
@@ -228,6 +271,8 @@ export function ChecklistPage() {
       try {
         await uncompleteTask(task.id, dateIso)
         await refetchConclusoes()
+      } catch (err) {
+        window.alert(err instanceof Error ? err.message : 'Erro ao desmarcar a tarefa.')
       } finally {
         setBusyKey(null)
       }
@@ -253,6 +298,8 @@ export function ChecklistPage() {
     try {
       await completeTask(task, dateIso, profile.id, { ...extra, photoFile: file })
       await refetchConclusoes()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Erro ao concluir a tarefa.')
     } finally {
       setBusyKey(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -260,7 +307,7 @@ export function ChecklistPage() {
   }
 
   async function handleDismissAtraso(conclusaoId: string) {
-    if (!window.confirm('Apagar a notificação de atraso? Esta ação não pode ser desfeita.')) return
+    if (!(await confirmar('Apagar a notificação de atraso? Esta ação não pode ser desfeita.'))) return
     await resolveJustificativaAtraso(conclusaoId)
     await refetchConclusoes()
   }
@@ -490,10 +537,19 @@ export function ChecklistPage() {
       )}
 
       {pendingProducao && (
-        <ProducaoModal
-          taskTitle={pendingProducao.task.title}
+        <ProducaoConclusaoModal
+          ficha={pendingProducao.ficha}
+          estoqueItens={(estoqueItensTodos ?? []).filter((it) => it.categoria === pendingProducao.ficha.setor)}
           onCancel={() => setPendingProducao(null)}
           onConfirm={handleProducaoConfirm}
+        />
+      )}
+
+      {pendingEtiqueta && (
+        <EtiquetaModal
+          producaoNome={pendingEtiqueta.producaoNome}
+          onCancel={() => setPendingEtiqueta(null)}
+          onConfirm={handleEtiquetaConfirm}
         />
       )}
 
@@ -592,61 +648,57 @@ function JustificativaModal({
   )
 }
 
-function ProducaoModal({
-  taskTitle,
+// Última etapa do fluxo de conclusão "envolve produção": pergunta quantas
+// etiquetas imprimir em vez do confirm() de sim/não com quantidade fixa em 1
+// (pedido do usuário) — "Não imprimir" fecha sem enfileirar nada.
+function EtiquetaModal({
+  producaoNome,
   onCancel,
   onConfirm,
 }: {
-  taskTitle: string
+  producaoNome: string
   onCancel: () => void
-  onConfirm: (quantidade: number, unidade: EstoqueUnidade) => void
+  onConfirm: (quantidade: number) => void
 }) {
-  const [quantidade, setQuantidade] = useState('')
-  const [unidade, setUnidade] = useState<EstoqueUnidade>('Quilo')
+  const [quantidade, setQuantidade] = useState('1')
   const quantidadeNum = Number(quantidade)
-  const isValid = quantidadeNum > 0
+  const isValid = Number.isInteger(quantidadeNum) && quantidadeNum > 0
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!isValid) return
-    onConfirm(quantidadeNum, unidade)
+    onConfirm(quantidadeNum)
   }
 
   return (
     <div className="modal-overlay">
       <div className="modal">
         <div className="modal-header">
-          <h3>Registrar produção</h3>
+          <h3>Imprimir etiqueta</h3>
           <button className="modal-close" onClick={onCancel}>
             ✕
           </button>
         </div>
         <form className="modal-body" onSubmit={handleSubmit}>
-          <p>
-            Concluir "{taskTitle}" gera um lote e dá entrada automática no Estoque. Informe a quantidade produzida.
-          </p>
-          <div className="field-row">
-            <div className="field">
-              <label>Quantidade *</label>
-              <input type="number" min="0.001" step="any" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required />
-            </div>
-            <div className="field">
-              <label>Unidade *</label>
-              <select value={unidade} onChange={(e) => setUnidade(e.target.value as EstoqueUnidade)}>
-                {ESTOQUE_UNIDADES_ENTRADA.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <p>Quantas etiquetas de "{producaoNome}" devem ser impressas?</p>
+          <div className="field">
+            <label>Número de etiquetas *</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              autoFocus
+              value={quantidade}
+              onChange={(e) => setQuantidade(e.target.value)}
+              required
+            />
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onCancel}>
-              Cancelar
+              Não imprimir
             </button>
             <button type="submit" className="btn btn-primary" disabled={!isValid}>
-              Confirmar
+              Adicionar à fila
             </button>
           </div>
         </form>

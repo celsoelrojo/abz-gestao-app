@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { isoDate } from '../../lib/date'
 import { supabase } from '../../lib/supabaseClient'
 import { visibleCategorias } from './estoqueAccess'
@@ -87,9 +88,9 @@ export function EstoqueRetiradaTab() {
     const mov = historico.find((m) => m.id === movimentoId)
     if (!mov) return
     if (
-      !window.confirm(
+      !(await confirmar(
         `Estornar a retirada de "${mov.produto}" (${estoqueQuantidadeLabel(mov.quantidade, mov.unidade)})? A quantidade volta ao Estoque e o histórico da correção fica registrado.`,
-      )
+      ))
     )
       return
     const { error: rpcError } = await supabase.rpc('estornar_retirada_estoque', { p_movimento_id: movimentoId })

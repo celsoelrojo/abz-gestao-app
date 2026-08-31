@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
+import { confirmar } from '../../store/confirmStore'
 import { visibleCategorias } from './estoqueAccess'
-import { agruparPorCampo, ordenarPorTitulo } from './estoqueHelpers'
+import { agruparPorCampo, estoqueQuantidadeLabel, ordenarPorTitulo } from './estoqueHelpers'
 import {
   ESTOQUE_CONDICOES_ARMAZENAMENTO,
   ESTOQUE_TIPOS_PRODUTO,
@@ -15,6 +16,7 @@ import {
   ESTOQUE_ITENS_KEY,
   TAXONOMIAS_KEY,
   criarProdutoEstoque,
+  excluirProdutoEstoque,
   registrarTaxonomia,
   taxonomiaValores,
   useEstoqueItens,
@@ -183,7 +185,7 @@ export function EstoqueCadastrarProdutoTab() {
     return (
       <div>
         {header}
-        <ProdutosCadastradosLista itens={itens ?? []} setores={setores} />
+        <ProdutosCadastradosLista itens={itens ?? []} setores={setores} podeExcluir={isFullAdmin(profile)} />
       </div>
     )
   }
@@ -350,11 +352,41 @@ export function EstoqueCadastrarProdutoTab() {
   )
 }
 
-function ProdutosCadastradosLista({ itens, setores }: { itens: EstoqueItemRow[]; setores: EstoqueCategoria[] }) {
+function ProdutosCadastradosLista({
+  itens,
+  setores,
+  podeExcluir,
+}: {
+  itens: EstoqueItemRow[]
+  setores: EstoqueCategoria[]
+  podeExcluir: boolean
+}) {
+  const queryClient = useQueryClient()
   const [editando, setEditando] = useState<EstoqueItemRow | null>(null)
+  const [excluindoId, setExcluindoId] = useState<string | null>(null)
 
   const itensVisiveis = useMemo(() => itens.filter((it) => setores.includes(it.categoria)), [itens, setores])
   const porSetor = useMemo(() => agruparPorCampo(itensVisiveis, (it) => it.categoria, '—'), [itensVisiveis])
+
+  // Pedido do usuário: botão de excluir só pro Administrador, com caixa de
+  // confirmação — usa o ConfirmModal custom (window.confirm não é confiável
+  // neste app, ver store/confirmStore.ts). Excluir é permitido mesmo com
+  // saldo em estoque (a RLS estoque_itens_admin_delete não olha quantidade,
+  // só o papel do usuário) — a caixa só avisa que esse saldo some junto,
+  // pra decisão consciente, sem bloquear.
+  async function handleExcluir(it: EstoqueItemRow) {
+    const avisoSaldo = it.quantidade > 0 ? ` Ainda há ${estoqueQuantidadeLabel(it.quantidade, it.unidade)} em estoque — esse saldo será perdido.` : ''
+    if (!(await confirmar(`Excluir o produto "${it.title}"?${avisoSaldo} Esta ação não pode ser desfeita.`))) return
+    setExcluindoId(it.id)
+    try {
+      await excluirProdutoEstoque(it.id)
+      await queryClient.invalidateQueries({ queryKey: ESTOQUE_ITENS_KEY })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Erro ao excluir produto.')
+    } finally {
+      setExcluindoId(null)
+    }
+  }
 
   return (
     <div>
@@ -381,6 +413,16 @@ function ProdutosCadastradosLista({ itens, setores }: { itens: EstoqueItemRow[];
                   <button className="icon-btn" title="Editar" onClick={() => setEditando(it)}>
                     ✎
                   </button>
+                  {podeExcluir && (
+                    <button
+                      className="icon-btn danger"
+                      title="Excluir"
+                      disabled={excluindoId === it.id}
+                      onClick={() => handleExcluir(it)}
+                    >
+                      🗑
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

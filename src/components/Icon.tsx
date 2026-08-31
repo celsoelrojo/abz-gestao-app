@@ -33,6 +33,7 @@ const OVERRIDES: Partial<Record<string, { strokeWidth?: number; scale?: number }
   accounts: { scale: 1.7 },
   gear: { scale: 1.7 },
   auditoria: { scale: 1.7 },
+  'sobre-nos': { scale: 1.7 },
 }
 
 const PATHS: Record<string, ReactNode> = {
@@ -190,6 +191,14 @@ const PATHS: Record<string, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8.2" />
       <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  // "Sobre nós": livro aberto (história/cultura/manual do time), duas
+  // páginas se encontrando na lombada central.
+  'sobre-nos': (
+    <>
+      <path d="M12 5.5c-1.8-1.3-4-2-6-2v13c2 0 4.2.7 6 2 1.8-1.3 4-2 6-2V3.5c-2 0-4.2.7-6 2Z" />
+      <path d="M12 5.5v13" />
     </>
   ),
 }

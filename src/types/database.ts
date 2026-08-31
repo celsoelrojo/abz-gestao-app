@@ -22,6 +22,7 @@ export type UserRole =
   | 'bar'
   | 'cozinha'
   | 'salao'
+  | 'freelancer'
 
 export type Setor = 'Bar' | 'Cozinha' | 'Salão'
 export type Periodicidade = 'Diária' | 'Semanal' | 'Quinzenal' | 'Mensal' | 'A cada turno' | 'Única'
@@ -234,16 +235,19 @@ export type FreelancerRow = {
   email: string | null
   observacoes: string | null
   status: 'ativo' | 'inativo'
+  profile_id: string | null
   created_at: string
   updated_at: string
 }
 
 export type FichaStatus = 'rascunho' | 'publicada' | 'inativa'
 
+// Pedido do usuário: o ingrediente passa a ser sempre um produto já
+// cadastrado no estoque (nome/unidade vêm de lá), igual ao que já foi feito
+// em ProducaoIngrediente — nome/unidade livres saem daqui.
 export type FichaIngredienteTecnica = {
   id: string
-  nome: string
-  unidade: string
+  estoqueItemId: string
   qtdBruta: number | null
   qtdLiquida: number | null
   fatorCorrecao: number | null
@@ -419,7 +423,12 @@ export type FichaProducaoLoteRow = {
 export type EstoqueCategoria = 'Bar' | 'Cozinha' | 'Salão' | 'Material de Limpeza' | 'Outros'
 export type EstoqueUnidade = 'Caixa' | 'Unidade' | 'Quilo' | 'Litro' | 'Grama' | 'Mililitro' | 'Pacote' | 'Fardo'
 export type MotivoRetirada = 'Produção' | 'Uso interno' | 'Perda' | 'Vencimento' | 'Quebra' | 'Transferência' | 'Outro'
-export type EstoqueMovimentoTipo = 'Entrada Manual' | 'Entrada por Produção' | 'Saída de Estoque' | 'Estorno de Retirada'
+export type EstoqueMovimentoTipo =
+  | 'Entrada Manual'
+  | 'Entrada por Produção'
+  | 'Saída de Estoque'
+  | 'Estorno de Retirada'
+  | 'Ajuste de Estoque'
 export type EstoqueTipoProduto = 'Matéria Prima' | 'Remanufaturado' | 'Pronto para Venda'
 export type EstoqueCondicaoArmazenamento = 'Ambiente' | 'Refrigerado' | 'Congelado'
 
@@ -448,7 +457,10 @@ export type EstoqueItemRow = {
 
 export type EstoqueMovimentoRow = {
   id: string
-  item_id: string
+  // Null quando o produto de estoque original foi excluído (ver migration
+  // 0030) — o movimento sobrevive como histórico, só perde o vínculo. Nome/
+  // categoria/unidade continuam legíveis via os campos snapshot abaixo.
+  item_id: string | null
   tipo: EstoqueMovimentoTipo
   categoria: EstoqueCategoria
   produto: string
@@ -569,6 +581,16 @@ export type AuditLogRow = {
   new_data: any
 }
 
+export type SobreNosSecaoChave = 'historia' | 'time' | 'cargos'
+
+export type SobreNosSecaoRow = {
+  chave: SobreNosSecaoChave
+  titulo: string
+  conteudo_html: string
+  atualizado_por: string | null
+  atualizado_em: string
+}
+
 type TableDef<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] }
 type ViewDef<Row> = { Row: Row; Relationships: [] }
 
@@ -596,6 +618,7 @@ export type Database = {
       reservas: TableDef<ReservaRow>
       reserva_capacidade: TableDef<ReservaCapacidadeRow>
       freelancer_escalas: TableDef<FreelancerEscalaRow>
+      sobre_nos_secoes: TableDef<SobreNosSecaoRow>
     }
     Views: {
       reservas_sem_contato: ViewDef<ReservaSemContatoRow>
@@ -629,16 +652,20 @@ export type Database = {
         Returns: EstoqueMovimentoRow
       }
       estornar_retirada_estoque: { Args: { p_movimento_id: string }; Returns: EstoqueMovimentoRow }
+      registrar_ajuste_estoque: {
+        Args: { p_item_id: string; p_nova_quantidade: number; p_observacao?: string | null }
+        Returns: EstoqueMovimentoRow
+      }
       reservas_hoje_resumo: {
         Args: Record<string, never>
         Returns: { periodo: ReservaPeriodo; total_pessoas: number }[]
       }
       registrar_producao_checklist: {
-        Args: { p_producao_id: string; p_quantidade: number; p_unidade: EstoqueUnidade }
+        Args: { p_producao_id: string; p_quantidade: number; p_ingredientes: { estoqueItemId: string; quantidade: number }[] }
         Returns: { lote_id: string; movimento_id: string }[]
       }
       reverter_producao_checklist: {
-        Args: { p_lote_id: string | null; p_movimento_id: string }
+        Args: { p_lote_id: string | null }
         Returns: undefined
       }
       checklist_agenda_todos_setores: {

@@ -2,9 +2,9 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabaseClient'
 import { isoDate } from '../../lib/date'
-import { registrarTaxonomia, taxonomiaValores, useTaxonomias } from '../estoque/useEstoque'
+import { registrarTaxonomia, taxonomiaValores, useEstoqueItens, useTaxonomias } from '../estoque/useEstoque'
 import { FICHA_VINCULO_TIPOS, useFichaVinculoOptions } from './useFichaVinculoOptions'
-import { FICHA_SETORES, FICHA_UNIDADES_SUGERIDAS } from './fichaConstants'
+import { FICHA_SETORES } from './fichaConstants'
 import { calcFichaCustos, calcIngredienteCustoTotal, calcIngredienteCustoUnitario } from './fichaHelpers'
 import { fichaImagemUrl, uploadFichaImagem } from './fichaStorage'
 import type { FichaIngredienteTecnica, FichaTecnicaRow, FichaVinculo, FichaVinculoTipo } from '../../types/database'
@@ -12,14 +12,21 @@ import type { FichaIngredienteTecnica, FichaTecnicaRow, FichaVinculo, FichaVincu
 function novoIngrediente(): FichaIngredienteTecnica {
   return {
     id: crypto.randomUUID(),
-    nome: '',
-    unidade: 'Quilo',
+    estoqueItemId: '',
     qtdBruta: null,
     qtdLiquida: null,
     fatorCorrecao: null,
     qtdBase: null,
     precoBase: null,
   }
+}
+
+// Junta o que já estava salvo em utensilios/equipamentos separados (fichas
+// antigas) num único campo de edição — pedido do usuário pra unificar os
+// dois. Ao salvar, o texto único vai só pra `equipamentos` (ver handleSave).
+function juntarUtensiliosEquipamentos(ficha: FichaTecnicaRow | null): string {
+  if (!ficha) return ''
+  return [ficha.utensilios, ficha.equipamentos].filter(Boolean).join(' / ')
 }
 
 export function FichaTecnicaFormModal({
@@ -52,18 +59,13 @@ export function FichaTecnicaFormModal({
   const [precoSugerido, setPrecoSugerido] = useState(ficha?.preco_sugerido?.toString() ?? '')
 
   const [etapas, setEtapas] = useState(ficha?.etapas ?? [])
-  const [utensilios, setUtensilios] = useState(ficha?.utensilios ?? '')
-  const [equipamentos, setEquipamentos] = useState(ficha?.equipamentos ?? '')
+  // Pedido do usuário: um único campo pra Utensílios + Equipamentos.
+  const [utensiliosEquipamentos, setUtensiliosEquipamentos] = useState(juntarUtensiliosEquipamentos(ficha))
   const [padraoApresentacao, setPadraoApresentacao] = useState(ficha?.padrao_apresentacao ?? '')
   const [boasPraticas, setBoasPraticas] = useState(ficha?.boas_praticas ?? '')
-  const [epis, setEpis] = useState(ficha?.epis ?? '')
   const [tempoPreparo, setTempoPreparo] = useState(ficha?.tempo_preparo ?? '')
 
-  const [alergenicos, setAlergenicos] = useState(ficha?.alergenicos ?? '')
-  const [infoNutricional, setInfoNutricional] = useState(ficha?.info_nutricional ?? '')
   const [observacoesGerais, setObservacoesGerais] = useState(ficha?.observacoes_gerais ?? '')
-  const [padraoQualidade, setPadraoQualidade] = useState(ficha?.padrao_qualidade ?? '')
-  const [criteriosReprovacao, setCriteriosReprovacao] = useState(ficha?.criterios_reprovacao ?? '')
   const [vinculos, setVinculos] = useState<FichaVinculo[]>(ficha?.vinculos ?? [])
   const [vinculoTipo, setVinculoTipo] = useState<FichaVinculoTipo | ''>('')
   const [vinculoId, setVinculoId] = useState('')
@@ -72,6 +74,8 @@ export function FichaTecnicaFormModal({
   const [submitting, setSubmitting] = useState<'rascunho' | 'publicada' | null>(null)
 
   const { data: taxonomias } = useTaxonomias('ficha_tecnica')
+  const { data: estoqueItens } = useEstoqueItens()
+  const estoqueItensDoSetor = useMemo(() => (estoqueItens ?? []).filter((it) => it.categoria === setor), [estoqueItens, setor])
   const categoriaOptions = useMemo(() => taxonomiaValores(taxonomias ?? [], setor, 'categoria'), [taxonomias, setor])
   const subcategoriaOptions = useMemo(
     () => taxonomiaValores(taxonomias ?? [], setor, 'subcategoria'),
@@ -128,17 +132,14 @@ export function FichaTecnicaFormModal({
         embalagem: embalagem === '' ? null : Number(embalagem),
         preco_sugerido: precoSugerido === '' ? null : Number(precoSugerido),
         etapas,
-        utensilios: utensilios.trim() || null,
-        equipamentos: equipamentos.trim() || null,
+        // Campo único (Utensílios + Equipamentos) grava só em `equipamentos`
+        // — `utensilios` para de ser escrito (fica com o valor antigo, se
+        // houver, mas não é mais editado nem lido por aqui).
+        equipamentos: utensiliosEquipamentos.trim() || null,
         padrao_apresentacao: padraoApresentacao.trim() || null,
         boas_praticas: boasPraticas.trim() || null,
-        epis: epis.trim() || null,
         tempo_preparo: tempoPreparo.trim() || null,
-        alergenicos: alergenicos.trim() || null,
-        info_nutricional: infoNutricional.trim() || null,
         observacoes_gerais: observacoesGerais.trim() || null,
-        padrao_qualidade: padraoQualidade.trim() || null,
-        criterios_reprovacao: criteriosReprovacao.trim() || null,
         vinculos,
         status: target,
         ultima_revisao_em: now,
@@ -233,64 +234,63 @@ export function FichaTecnicaFormModal({
 
           <h4 className="section-label">Ingredientes e custos</h4>
           <div className="manage-list">
-            {ingredientes.map((ing) => (
-              <div className="manage-row" key={ing.id}>
-                <div className="manage-row-info" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
-                  <input placeholder="Nome" value={ing.nome} onChange={(e) => updateIngrediente(ing.id, { nome: e.target.value })} />
-                  <input
-                    placeholder="Unidade"
-                    value={ing.unidade}
-                    onChange={(e) => updateIngrediente(ing.id, { unidade: e.target.value })}
-                    list="ft-unidade-list"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Qtd bruta"
-                    value={ing.qtdBruta ?? ''}
-                    onChange={(e) => updateIngrediente(ing.id, { qtdBruta: e.target.value === '' ? null : Number(e.target.value) })}
-                  />
-                  <input
-                    type="number"
-                    placeholder="Qtd líquida"
-                    value={ing.qtdLiquida ?? ''}
-                    onChange={(e) => updateIngrediente(ing.id, { qtdLiquida: e.target.value === '' ? null : Number(e.target.value) })}
-                  />
-                  <input
-                    type="number"
-                    placeholder="Fator correção"
-                    value={ing.fatorCorrecao ?? ''}
-                    onChange={(e) => updateIngrediente(ing.id, { fatorCorrecao: e.target.value === '' ? null : Number(e.target.value) })}
-                  />
-                  <button type="button" className="icon-btn danger" onClick={() => setIngredientes((prev) => prev.filter((i) => i.id !== ing.id))}>
-                    🗑
-                  </button>
+            {ingredientes.map((ing) => {
+              const item = estoqueItensDoSetor.find((it) => it.id === ing.estoqueItemId)
+              return (
+                <div className="manage-row" key={ing.id}>
+                  <div className="manage-row-info" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+                    <select value={ing.estoqueItemId} onChange={(e) => updateIngrediente(ing.id, { estoqueItemId: e.target.value })}>
+                      <option value="">Produto...</option>
+                      {estoqueItensDoSetor.map((it) => (
+                        <option key={it.id} value={it.id}>
+                          {it.title}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      placeholder={item ? `Qtd bruta (${item.unidade})` : 'Qtd bruta'}
+                      value={ing.qtdBruta ?? ''}
+                      onChange={(e) => updateIngrediente(ing.id, { qtdBruta: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Qtd líquida"
+                      value={ing.qtdLiquida ?? ''}
+                      onChange={(e) => updateIngrediente(ing.id, { qtdLiquida: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Fator correção"
+                      value={ing.fatorCorrecao ?? ''}
+                      onChange={(e) => updateIngrediente(ing.id, { fatorCorrecao: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                    <button type="button" className="icon-btn danger" onClick={() => setIngredientes((prev) => prev.filter((i) => i.id !== ing.id))}>
+                      🗑
+                    </button>
+                  </div>
+                  <div className="manage-row-info" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginTop: 6 }}>
+                    <input
+                      type="number"
+                      placeholder="Qtd base (embalagem)"
+                      value={ing.qtdBase ?? ''}
+                      onChange={(e) => updateIngrediente(ing.id, { qtdBase: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Preço base (R$)"
+                      value={ing.precoBase ?? ''}
+                      onChange={(e) => updateIngrediente(ing.id, { precoBase: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                    <span className="task-meta">
+                      Custo unit.: R$ {calcIngredienteCustoUnitario(ing).toFixed(4)} · Total: R${' '}
+                      {calcIngredienteCustoTotal(ing).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
-                <div className="manage-row-info" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginTop: 6 }}>
-                  <input
-                    type="number"
-                    placeholder="Qtd base (embalagem)"
-                    value={ing.qtdBase ?? ''}
-                    onChange={(e) => updateIngrediente(ing.id, { qtdBase: e.target.value === '' ? null : Number(e.target.value) })}
-                  />
-                  <input
-                    type="number"
-                    placeholder="Preço base (R$)"
-                    value={ing.precoBase ?? ''}
-                    onChange={(e) => updateIngrediente(ing.id, { precoBase: e.target.value === '' ? null : Number(e.target.value) })}
-                  />
-                  <span className="task-meta">
-                    Custo unit.: R$ {calcIngredienteCustoUnitario(ing).toFixed(4)} · Total: R${' '}
-                    {calcIngredienteCustoTotal(ing).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
-          <datalist id="ft-unidade-list">
-            {FICHA_UNIDADES_SUGERIDAS.map((u) => (
-              <option key={u} value={u} />
-            ))}
-          </datalist>
           <button type="button" className="btn btn-ghost" onClick={() => setIngredientes((prev) => [...prev, novoIngrediente()])}>
             + Adicionar ingrediente
           </button>
@@ -346,12 +346,12 @@ export function FichaTecnicaFormModal({
 
           <div className="field-row" style={{ marginTop: 12 }}>
             <div className="field">
-              <label>Utensílios</label>
-              <input value={utensilios} onChange={(e) => setUtensilios(e.target.value)} />
+              <label>Utensílios e Equipamentos</label>
+              <input value={utensiliosEquipamentos} onChange={(e) => setUtensiliosEquipamentos(e.target.value)} />
             </div>
             <div className="field">
-              <label>Equipamentos</label>
-              <input value={equipamentos} onChange={(e) => setEquipamentos(e.target.value)} />
+              <label>Tempo de preparo</label>
+              <input value={tempoPreparo} onChange={(e) => setTempoPreparo(e.target.value)} />
             </div>
           </div>
           <div className="field-row">
@@ -364,41 +364,11 @@ export function FichaTecnicaFormModal({
               <textarea rows={2} value={boasPraticas} onChange={(e) => setBoasPraticas(e.target.value)} />
             </div>
           </div>
-          <div className="field-row">
-            <div className="field">
-              <label>EPIs</label>
-              <input value={epis} onChange={(e) => setEpis(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Tempo de preparo</label>
-              <input value={tempoPreparo} onChange={(e) => setTempoPreparo(e.target.value)} />
-            </div>
-          </div>
 
-          <h4 className="section-label">Segurança e informações complementares</h4>
-          <div className="field-row">
-            <div className="field">
-              <label>Alergênicos</label>
-              <textarea rows={2} value={alergenicos} onChange={(e) => setAlergenicos(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Informações nutricionais</label>
-              <textarea rows={2} value={infoNutricional} onChange={(e) => setInfoNutricional(e.target.value)} />
-            </div>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>Observações gerais</label>
-              <textarea rows={2} value={observacoesGerais} onChange={(e) => setObservacoesGerais(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Padrão de qualidade</label>
-              <textarea rows={2} value={padraoQualidade} onChange={(e) => setPadraoQualidade(e.target.value)} />
-            </div>
-          </div>
+          <h4 className="section-label">Informações complementares</h4>
           <div className="field">
-            <label>Critérios de reprovação</label>
-            <textarea rows={2} value={criteriosReprovacao} onChange={(e) => setCriteriosReprovacao(e.target.value)} />
+            <label>Observações gerais</label>
+            <textarea rows={2} value={observacoesGerais} onChange={(e) => setObservacoesGerais(e.target.value)} />
           </div>
 
           <div className="field">

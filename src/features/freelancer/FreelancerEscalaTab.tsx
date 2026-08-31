@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabaseClient'
+import { confirmar } from '../../store/confirmStore'
 import { isoDate, formatWeekdayLong, weekdayNameForDate } from '../../lib/date'
 import { getWeekDates } from '../checklist/scheduling'
 import { FREELANCER_ESCALAS_KEY, useFreelancerEscalas, useFreelancers } from './useFreelancers'
@@ -50,7 +51,7 @@ export function FreelancerEscalaTab() {
   }
 
   async function excluir(e: FreelancerEscalaRow) {
-    if (!window.confirm('Excluir esta escala? Se o pagamento ainda não foi feito, a tarefa correspondente no Checklist também é apagada.'))
+    if (!(await confirmar('Excluir esta escala? Se o pagamento ainda não foi feito, a tarefa correspondente no Checklist também é apagada.')))
       return
     const { error } = await supabase.from('freelancer_escalas').delete().eq('id', e.id)
     if (error) {

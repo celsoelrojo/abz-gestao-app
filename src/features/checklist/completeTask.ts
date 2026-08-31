@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabaseClient'
-import type { ChecklistTaskRow, EstoqueUnidade } from '../../types/database'
+import type { ChecklistTaskRow } from '../../types/database'
 
 export interface JustificativaAtraso {
   texto: string
@@ -12,8 +12,8 @@ export interface Antecipacao {
 }
 
 export interface ProducaoRegistro {
-  quantidade: number
-  unidade: EstoqueUnidade
+  rendimento: number
+  ingredientes: { estoqueItemId: string; quantidade: number }[]
 }
 
 export interface CompleteTaskOptions {
@@ -50,17 +50,19 @@ export async function completeTask(
   }
 
   // "Envolve produção" e foto obrigatória são mutuamente exclusivos (ver
-  // ManageChecklistModal) — quando a tarefa envolve produção, registrar_
-  // producao_checklist gera o lote + dá entrada no Estoque, e os ids voltam
-  // pra anexar na conclusão (usados depois pra reverter, se desmarcada, e
-  // pra imprimir a etiqueta).
+  // ManageChecklistModal) — quando a tarefa envolve produção,
+  // registrar_producao_checklist gera o lote, dá entrada no produto
+  // remanufaturado E baixa os ingredientes usados (rendimento + quantidades
+  // vêm do ProducaoConclusaoModal, já ajustados pelo operador), e os ids
+  // voltam pra anexar na conclusão (usados depois pra reverter, se
+  // desmarcada, e pra imprimir a etiqueta).
   let loteId: string | null = null
   let movimentoEstoqueId: string | null = null
   if (task.envolve_producao && task.producao_vinculada_id && options.producao) {
     const { data, error: rpcError } = await supabase.rpc('registrar_producao_checklist', {
       p_producao_id: task.producao_vinculada_id,
-      p_quantidade: options.producao.quantidade,
-      p_unidade: options.producao.unidade,
+      p_quantidade: options.producao.rendimento,
+      p_ingredientes: options.producao.ingredientes,
     })
     if (rpcError) throw rpcError
     loteId = data[0].lote_id
@@ -88,24 +90,25 @@ export async function completeTask(
   return { loteId }
 }
 
-// A ordem importa: lote_id/movimento_estoque_id em checklist_conclusoes têm
-// FK (sem cascade) pra fichas_producao_lotes/estoque_movimentos — apagar a
-// conclusão primeiro libera essas linhas pra reverter_producao_checklist
-// poder de fato deletá-las (ela roda DEPOIS, nunca antes).
+// A ordem importa: lote_id em checklist_conclusoes tem FK (sem cascade) pra
+// fichas_producao_lotes — apagar a conclusão primeiro libera essa linha pra
+// reverter_producao_checklist poder de fato deletá-la (ela roda DEPOIS,
+// nunca antes). Reverter agora desfaz TODOS os movimentos presos ao lote —
+// entrada do remanufaturado + cada baixa de ingrediente (migration 0032) —
+// achados só por lote_id, sem precisar mais do movimento_estoque_id.
 export async function uncompleteTask(taskId: number, dataReferencia: string) {
   const { data: deleted, error } = await supabase
     .from('checklist_conclusoes')
     .delete()
     .eq('task_id', taskId)
     .eq('data_referencia', dataReferencia)
-    .select('lote_id, movimento_estoque_id')
+    .select('lote_id')
     .maybeSingle()
   if (error) throw error
 
-  if (deleted?.lote_id && deleted?.movimento_estoque_id) {
+  if (deleted?.lote_id) {
     const { error: rpcError } = await supabase.rpc('reverter_producao_checklist', {
       p_lote_id: deleted.lote_id,
-      p_movimento_id: deleted.movimento_estoque_id,
     })
     if (rpcError) throw rpcError
   }

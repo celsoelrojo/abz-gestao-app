@@ -215,6 +215,37 @@ export async function atualizarProdutoEstoque(
   return data as EstoqueItemRow
 }
 
+// Exclusão do cadastro (botão 🗑 em "Produtos cadastrados") — só
+// Administrador (RLS estoque_itens_admin_delete, migration 0029). O Postgres
+// ainda recusa apagar um produto que já tem entrada/retirada registrada
+// (estoque_movimentos.item_id é FK obrigatória, sem ON DELETE) — de
+// propósito, apagar o cadastro nunca deve apagar histórico de movimentação.
+// 23503 = foreign_key_violation, traduzido pra mensagem amigável.
+export async function excluirProdutoEstoque(id: string): Promise<void> {
+  const { error } = await supabase.from('estoque_itens').delete().eq('id', id)
+  if (error) {
+    if (error.code === '23503') {
+      throw new Error('Não é possível excluir: este produto já tem entradas ou retiradas registradas no histórico.')
+    }
+    throw error
+  }
+}
+
+// Ajuste manual de quantidade (botão "⚖ Ajustar" na aba Estoque) — só
+// Administrador (checado de novo dentro da função, RPC é SECURITY DEFINER).
+// Sempre passa a quantidade ATUAL da linha, não a diferença — o RPC calcula
+// e grava a diferença no movimento (pode ser negativa), pra manter o mesmo
+// histórico auditável de Entrada/Retirada em vez de um UPDATE direto sem
+// rastro.
+export async function ajustarQuantidadeEstoque(itemId: string, novaQuantidade: number, observacao: string | null): Promise<void> {
+  const { error } = await supabase.rpc('registrar_ajuste_estoque', {
+    p_item_id: itemId,
+    p_nova_quantidade: novaQuantidade,
+    p_observacao: observacao,
+  })
+  if (error) throw error
+}
+
 // Nota: existiu aqui um findOrCreateEstoqueItem() usado pela aba "Entrada no
 // Estoque" pra criar produto na hora, digitando o nome livre. Removido
 // quando Entrada passou a exigir produto já cadastrado (ver

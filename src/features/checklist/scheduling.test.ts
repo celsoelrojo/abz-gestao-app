@@ -12,6 +12,8 @@ function makeTask(overrides: Partial<ChecklistTaskRow>): ChecklistTaskRow {
     title: 'Tarefa de teste',
     description: '',
     responsavel_nome: 'Fulano',
+    responsavel_id: null,
+    turno: null,
     periodicidade: 'Diária',
     dias: ALL_WEEKDAYS,
     data_unica: null,

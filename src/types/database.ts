@@ -45,6 +45,8 @@ export type ChecklistTaskRow = {
   title: string
   description: string
   responsavel_nome: string
+  responsavel_id: string | null
+  turno: ReservaPeriodo | null
   periodicidade: Periodicidade
   dias: Weekday[]
   data_unica: string | null
@@ -671,6 +673,10 @@ export type Database = {
       checklist_agenda_todos_setores: {
         Args: Record<string, never>
         Returns: ChecklistAgendaRow[]
+      }
+      checklist_responsaveis_disponiveis: {
+        Args: { p_setor: Setor }
+        Returns: { id: string; nome: string }[]
       }
       checklist_concluidas_em: {
         Args: { p_data: string }

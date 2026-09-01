@@ -6,10 +6,11 @@ import { supabase } from '../../lib/supabaseClient'
 import { toggleSemanaDoMes, toggleValue } from './taskFormHelpers'
 import { CHECKLIST_TASKS_ALL_KEY, CHECKLIST_TASKS_KEY, useAllChecklistTasksForManage } from './useChecklistTasks'
 import { VINCULO_TIPOS, useVinculoOptions, type VinculoTipo } from '../../lib/vinculo'
-import type { ChecklistTaskRow, Periodicidade, Setor, Weekday } from '../../types/database'
+import type { ChecklistTaskRow, Periodicidade, ReservaPeriodo, Setor, Weekday } from '../../types/database'
 
 const ALL_WEEKDAYS: Weekday[] = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
 const PERIODICIDADES: Periodicidade[] = ['A cada turno', 'Diária', 'Semanal', 'Quinzenal', 'Mensal', 'Única']
+const TURNOS: ReservaPeriodo[] = ['Almoço', 'Noite']
 const SEMANA_MES_OPTIONS: { value: string; label: string }[] = [
   { value: '1', label: '1ª' },
   { value: '2', label: '2ª' },
@@ -99,6 +100,7 @@ export function ManageChecklistModal({ onClose }: { onClose: () => void }) {
                       <strong>{task.title}</strong>
                       <span>
                         {task.periodicidade} · {task.responsavel_nome}
+                        {task.turno ? ` · ${task.turno}` : ''}
                         {task.vinculo_tipo ? ` · Vínculo: ${task.vinculo_tipo}` : ''}
                         {!task.active ? ' · inativa' : ''}
                       </span>
@@ -181,7 +183,8 @@ function TaskFormModal({
   const [setor, setSetor] = useState<Setor>(task?.setor ?? lockedSetor ?? defaultSetor)
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
-  const [responsavelNome, setResponsavelNome] = useState(task?.responsavel_nome ?? '')
+  const [responsavelId, setResponsavelId] = useState(task?.responsavel_id ?? '')
+  const [turno, setTurno] = useState<ReservaPeriodo | ''>(task?.turno ?? '')
   const [periodicidade, setPeriodicidade] = useState<Periodicidade>(task?.periodicidade ?? 'Diária')
   const [dias, setDias] = useState<Weekday[]>(task?.dias ?? [])
   const [semanasDoMes, setSemanasDoMes] = useState<string[]>(task?.semanas_do_mes ?? [])
@@ -194,6 +197,19 @@ function TaskFormModal({
   const [vinculoTipo, setVinculoTipo] = useState<VinculoTipo | ''>((task?.vinculo_tipo as VinculoTipo) || '')
   const [vinculoId, setVinculoId] = useState(task?.vinculo_id ?? '')
   const vinculoOptions = useVinculoOptions(vinculoTipo || null, setor)
+
+  // "Responsável" deixou de ser texto livre — agora é vinculado a um
+  // usuário já cadastrado. profiles_select_own_or_admin (migration 0001)
+  // não deixa um Gestor de setor listar os colegas direto, por isso a RPC
+  // dedicada (migration 0037) em vez de supabase.from('profiles').select().
+  const { data: responsaveisDisponiveis, isLoading: loadingResponsaveis } = useQuery({
+    queryKey: ['checklist_responsaveis_disponiveis', setor],
+    queryFn: async () => {
+      const { data, error: qError } = await supabase.rpc('checklist_responsaveis_disponiveis', { p_setor: setor })
+      if (qError) throw qError
+      return data
+    },
+  })
 
   // Mutuamente exclusivo com foto obrigatória: uma tarefa que envolve
   // produção nunca também pede foto (o registro do lote já é a evidência).
@@ -223,7 +239,8 @@ function TaskFormModal({
 
   const isValid =
     !!title.trim() &&
-    !!responsavelNome.trim() &&
+    !!responsavelId &&
+    !!turno &&
     (periodicidade !== 'Única' || !!dataUnica) &&
     (!needsDiasPicker || dias.length > 0) &&
     (!needsSemanaMes || semanasDoMes.length === semanaMesMax) &&
@@ -232,6 +249,8 @@ function TaskFormModal({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!isValid) return
+    const responsavel = responsaveisDisponiveis?.find((r) => r.id === responsavelId)
+    if (!responsavel) return
     setError(null)
     setSubmitting(true)
     try {
@@ -239,7 +258,9 @@ function TaskFormModal({
         setor,
         title: title.trim(),
         description: description.trim(),
-        responsavel_nome: responsavelNome.trim(),
+        responsavel_id: responsavel.id,
+        responsavel_nome: responsavel.nome,
+        turno,
         periodicidade,
         dias: periodicidade === 'Única' ? [] : dias,
         data_unica: periodicidade === 'Única' ? dataUnica : null,
@@ -283,6 +304,7 @@ function TaskFormModal({
                   setSetor(e.target.value as Setor)
                   setVinculoId('')
                   setProducaoVinculadaId('')
+                  setResponsavelId('')
                 }}
                 disabled={!!lockedSetor}
               >
@@ -295,7 +317,17 @@ function TaskFormModal({
             </div>
             <div className="field">
               <label>Responsável *</label>
-              <input value={responsavelNome} onChange={(e) => setResponsavelNome(e.target.value)} required />
+              <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} required>
+                <option value="">{loadingResponsaveis ? 'Carregando...' : 'Selecione...'}</option>
+                {responsaveisDisponiveis?.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.nome}
+                  </option>
+                ))}
+              </select>
+              {responsaveisDisponiveis?.length === 0 && !loadingResponsaveis && (
+                <span className="field-hint">Nenhum usuário ativo cadastrado em {setor} ainda.</span>
+              )}
             </div>
           </div>
 
@@ -337,6 +369,20 @@ function TaskFormModal({
               </div>
             </div>
           )}
+
+          <div className="field">
+            <label>Turno *</label>
+            <select value={turno} onChange={(e) => setTurno(e.target.value as ReservaPeriodo)} required>
+              <option value="" disabled>
+                Selecione...
+              </option>
+              {TURNOS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {needsSemanaMes && (
             <div className="field">

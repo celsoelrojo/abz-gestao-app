@@ -4,7 +4,12 @@ import { isFullAdmin, useAuthStore } from '../../store/authStore'
 import { confirmar } from '../../store/confirmStore'
 import { supabase } from '../../lib/supabaseClient'
 import { toggleSemanaDoMes, toggleValue } from './taskFormHelpers'
-import { CHECKLIST_TASKS_ALL_KEY, CHECKLIST_TASKS_KEY, useAllChecklistTasksForManage } from './useChecklistTasks'
+import {
+  CHECKLIST_TASKS_ALL_KEY,
+  CHECKLIST_TASKS_KEY,
+  useAllChecklistTasksForManage,
+  useResponsaveisDisponiveis,
+} from './useChecklistTasks'
 import { VINCULO_TIPOS, useVinculoOptions, type VinculoTipo } from '../../lib/vinculo'
 import type { ChecklistTaskRow, Periodicidade, ReservaPeriodo, Setor, Weekday } from '../../types/database'
 
@@ -199,17 +204,8 @@ function TaskFormModal({
   const vinculoOptions = useVinculoOptions(vinculoTipo || null, setor)
 
   // "Responsável" deixou de ser texto livre — agora é vinculado a um
-  // usuário já cadastrado. profiles_select_own_or_admin (migration 0001)
-  // não deixa um Gestor de setor listar os colegas direto, por isso a RPC
-  // dedicada (migration 0037) em vez de supabase.from('profiles').select().
-  const { data: responsaveisDisponiveis, isLoading: loadingResponsaveis } = useQuery({
-    queryKey: ['checklist_responsaveis_disponiveis', setor],
-    queryFn: async () => {
-      const { data, error: qError } = await supabase.rpc('checklist_responsaveis_disponiveis', { p_setor: setor })
-      if (qError) throw qError
-      return data
-    },
-  })
+  // usuário já cadastrado (migration 0037).
+  const { data: responsaveisDisponiveis, isLoading: loadingResponsaveis } = useResponsaveisDisponiveis(setor)
 
   // Mutuamente exclusivo com foto obrigatória: uma tarefa que envolve
   // produção nunca também pede foto (o registro do lote já é a evidência).

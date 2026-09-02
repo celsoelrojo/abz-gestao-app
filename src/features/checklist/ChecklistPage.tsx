@@ -9,7 +9,15 @@ import { enqueuePrintJob } from '../../lib/printing/printQueue'
 import { useEstoqueItens } from '../estoque/useEstoque'
 import { useFichasProducao } from '../fichas/useFichasProducao'
 import { findOverdueInfo, getUpcomingDays, getWeekDates, isTaskScheduledOn } from './scheduling'
-import { useChecklistConclusoesRange, useChecklistRealtime, useChecklistTasks } from './useChecklistTasks'
+import {
+  definirResponsavelDia,
+  removerResponsavelDia,
+  useChecklistConclusoesRange,
+  useChecklistRealtime,
+  useChecklistResponsavelDiaRange,
+  useChecklistTasks,
+  useResponsaveisDisponiveis,
+} from './useChecklistTasks'
 import { checklistFotoUrl, completeTask, resolveJustificativaAtraso, uncompleteTask } from './completeTask'
 import type { CompleteTaskOptions } from './completeTask'
 import { ManageChecklistModal } from './ManageChecklistModal'
@@ -17,6 +25,7 @@ import { ProducaoConclusaoModal } from './ProducaoConclusaoModal'
 import type { IngredienteUsado } from './ProducaoConclusaoModal'
 import type {
   ChecklistConclusaoRow,
+  ChecklistResponsavelDiaRow,
   ChecklistTaskRow,
   FichaProducaoLoteRow,
   FichaProducaoRow,
@@ -45,6 +54,7 @@ export function ChecklistPage() {
     weekStartIso,
     upcomingEndIso,
   )
+  const { data: responsavelDiaRange } = useChecklistResponsavelDiaRange(weekStartIso, upcomingEndIso)
   useChecklistRealtime()
   // Só pra montar a caixa de conclusão de tarefas "envolve produção" —
   // precisa da ficha inteira (ingredientes, rendimento) e dos itens de
@@ -78,6 +88,9 @@ export function ChecklistPage() {
     condicaoArmazenamento: string | null
     lote: FichaProducaoLoteRow
   } | null>(null)
+  const [pendingTrocaResponsavel, setPendingTrocaResponsavel] = useState<{ task: ChecklistTaskRow; dateIso: string } | null>(
+    null,
+  )
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [manageOpen, setManageOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -89,6 +102,24 @@ export function ChecklistPage() {
     conclusoesRange?.forEach((c) => map.set(keyFor(c.task_id, c.data_referencia), c))
     return map
   }, [conclusoesRange])
+
+  const responsavelOverrideByKey = useMemo(() => {
+    const map = new Map<string, ChecklistResponsavelDiaRow>()
+    responsavelDiaRange?.forEach((r) => map.set(keyFor(r.task_id, r.data_referencia), r))
+    return map
+  }, [responsavelDiaRange])
+
+  // Pedido do usuário: trocar o responsável de UMA tarefa só naquele dia,
+  // exclusivo de quem gerencia o setor DAQUELA tarefa (Gestor só no
+  // próprio, Administrador em qualquer um — mesma regra de is_manager já
+  // usada no resto do Checklist). Tarefa de pagamento de freelancer nunca
+  // entra (não é uma atribuição de equipe de verdade).
+  function podeTrocarResponsavel(task: ChecklistTaskRow): boolean {
+    return !task.freelancer_pagamento && isManager(profile, task.setor)
+  }
+  function responsavelEfetivo(task: ChecklistTaskRow, dateIso: string): string {
+    return responsavelOverrideByKey.get(keyFor(task.id, dateIso))?.responsavel_nome ?? task.responsavel_nome
+  }
 
   const completedDatesByTask = useMemo(() => {
     const map = new Map<number, string[]>()
@@ -366,6 +397,9 @@ export function ChecklistPage() {
                     onToggle={() => handleToggle(t, dateIso)}
                     showAntecipadaBadge={false}
                     isToday={dateIso === todayIso}
+                    responsavelNome={responsavelEfetivo(t, dateIso)}
+                    canTrocarResponsavel={podeTrocarResponsavel(t)}
+                    onTrocarResponsavel={() => setPendingTrocaResponsavel({ task: t, dateIso })}
                   />
                 )
               })}
@@ -394,6 +428,9 @@ export function ChecklistPage() {
                       onToggle={() => handleToggle(t, todayIso)}
                       showAntecipadaBadge={false}
                       showSetorBadge={showSetorBadges}
+                      responsavelNome={responsavelEfetivo(t, todayIso)}
+                      canTrocarResponsavel={podeTrocarResponsavel(t)}
+                      onTrocarResponsavel={() => setPendingTrocaResponsavel({ task: t, dateIso: todayIso })}
                     />
                   )
                 })}
@@ -459,6 +496,9 @@ export function ChecklistPage() {
                       onToggle={() => handleToggle(task, todayIso)}
                       showAntecipadaBadge={canManage}
                       isToday
+                      responsavelNome={responsavelEfetivo(task, todayIso)}
+                      canTrocarResponsavel={podeTrocarResponsavel(task)}
+                      onTrocarResponsavel={() => setPendingTrocaResponsavel({ task, dateIso: todayIso })}
                     />
                   )
                 })}
@@ -485,6 +525,9 @@ export function ChecklistPage() {
                       busyKey={busyKey}
                       canManage={canManage}
                       onToggle={handleToggle}
+                      responsavelEfetivo={responsavelEfetivo}
+                      podeTrocarResponsavel={podeTrocarResponsavel}
+                      onTrocarResponsavel={(task, dateIso) => setPendingTrocaResponsavel({ task, dateIso })}
                     />
                   ))}
                 </div>
@@ -503,6 +546,9 @@ export function ChecklistPage() {
                   busyKey={busyKey}
                   canManage={canManage}
                   onToggle={handleToggle}
+                  responsavelEfetivo={responsavelEfetivo}
+                  podeTrocarResponsavel={podeTrocarResponsavel}
+                  onTrocarResponsavel={(task, dateIso) => setPendingTrocaResponsavel({ task, dateIso })}
                 />
               ))}
             </>
@@ -553,6 +599,18 @@ export function ChecklistPage() {
         />
       )}
 
+      {pendingTrocaResponsavel && (
+        <TrocarResponsavelModal
+          task={pendingTrocaResponsavel.task}
+          dateIso={pendingTrocaResponsavel.dateIso}
+          effectiveResponsavelId={
+            responsavelOverrideByKey.get(keyFor(pendingTrocaResponsavel.task.id, pendingTrocaResponsavel.dateIso))
+              ?.responsavel_id ?? pendingTrocaResponsavel.task.responsavel_id
+          }
+          onClose={() => setPendingTrocaResponsavel(null)}
+        />
+      )}
+
       {manageOpen && <ManageChecklistModal onClose={() => setManageOpen(false)} />}
     </div>
   )
@@ -571,12 +629,18 @@ function UpcomingDayGroup({
   busyKey,
   canManage,
   onToggle,
+  responsavelEfetivo,
+  podeTrocarResponsavel,
+  onTrocarResponsavel,
 }: {
   group: UpcomingDay
   conclusaoByKey: Map<string, ChecklistConclusaoRow>
   busyKey: string | null
   canManage: boolean
   onToggle: (task: ChecklistTaskRow, dateIso: string) => void
+  responsavelEfetivo: (task: ChecklistTaskRow, dateIso: string) => string
+  podeTrocarResponsavel: (task: ChecklistTaskRow) => boolean
+  onTrocarResponsavel: (task: ChecklistTaskRow, dateIso: string) => void
 }) {
   return (
     <div className="week-day-group">
@@ -594,6 +658,9 @@ function UpcomingDayGroup({
               busy={busyKey === keyFor(task.id, group.dateIso)}
               onToggle={() => onToggle(task, group.dateIso)}
               showAntecipadaBadge={canManage}
+              responsavelNome={responsavelEfetivo(task, group.dateIso)}
+              canTrocarResponsavel={podeTrocarResponsavel(task)}
+              onTrocarResponsavel={() => onTrocarResponsavel(task, group.dateIso)}
             />
           )
         })}
@@ -707,6 +774,89 @@ function EtiquetaModal({
   )
 }
 
+// Trocar o responsável de UMA tarefa só naquele dia — pedido do usuário:
+// "não é necessário pedir confirmação", então escolher na caixa já salva
+// direto (sem passo de confirmar). Escolher o responsável PADRÃO da tarefa
+// remove o override do dia (volta a valer o padrão), em vez de gravar uma
+// linha redundante.
+function TrocarResponsavelModal({
+  task,
+  dateIso,
+  effectiveResponsavelId,
+  onClose,
+}: {
+  task: ChecklistTaskRow
+  dateIso: string
+  effectiveResponsavelId: string | null
+  onClose: () => void
+}) {
+  const profile = useAuthStore((s) => s.profile)
+  const queryClient = useQueryClient()
+  const { data: responsaveis, isLoading } = useResponsaveisDisponiveis(task.setor)
+  const [selecionado, setSelecionado] = useState(effectiveResponsavelId ?? '')
+  const [salvando, setSalvando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleChange(novoId: string) {
+    if (!profile || !novoId || novoId === selecionado) return
+    const responsavel = responsaveis?.find((r) => r.id === novoId)
+    if (!responsavel) return
+    setSelecionado(novoId)
+    setSalvando(true)
+    setError(null)
+    try {
+      if (novoId === task.responsavel_id) {
+        await removerResponsavelDia(task.id, dateIso)
+      } else {
+        await definirResponsavelDia(task.id, dateIso, responsavel.id, responsavel.nome, profile.id)
+      }
+      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'checklist_responsavel_dia' })
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao trocar o responsável.')
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <div className="modal-header">
+          <h3>Responsável de hoje</h3>
+          <button className="modal-close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">
+          <p className="field-hint" style={{ marginBottom: 12 }}>
+            "{task.title}" — vale só para {formatDateBR(dateIso)}; o responsável padrão da tarefa não muda.
+          </p>
+          <div className="field">
+            <label>Responsável</label>
+            <select value={selecionado} onChange={(e) => handleChange(e.target.value)} disabled={salvando || isLoading} autoFocus>
+              <option value="" disabled>
+                {isLoading ? 'Carregando...' : 'Selecione...'}
+              </option>
+              {responsaveis?.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nome}
+                  {r.id === task.responsavel_id ? ' (padrão)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          {error && <p className="login-error">{error}</p>}
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={salvando}>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TaskRow({
   task,
   dateIso,
@@ -718,6 +868,9 @@ function TaskRow({
   showAntecipadaBadge,
   showSetorBadge,
   isToday,
+  responsavelNome,
+  canTrocarResponsavel,
+  onTrocarResponsavel,
 }: {
   task: ChecklistTaskRow
   dateIso: string
@@ -729,6 +882,9 @@ function TaskRow({
   showAntecipadaBadge: boolean
   showSetorBadge?: boolean
   isToday?: boolean
+  responsavelNome: string
+  canTrocarResponsavel: boolean
+  onTrocarResponsavel: () => void
 }) {
   const rowClass =
     overdueDaysLate != null
@@ -763,7 +919,7 @@ function TaskRow({
         )}
         {task.description && <div className="task-desc">{task.description}</div>}
         <div className="task-meta">
-          <span>{task.responsavel_nome}</span>
+          <span>{responsavelNome}</span>
         </div>
         {completed && conclusao && (
           <div className="task-completion">
@@ -797,6 +953,13 @@ function TaskRow({
           </>
         )}
       </div>
+      {canTrocarResponsavel && (
+        <div className="task-actions">
+          <button type="button" className="icon-btn" title="Trocar responsável só de hoje" onClick={onTrocarResponsavel}>
+            👤
+          </button>
+        </div>
+      )}
     </div>
   )
 }

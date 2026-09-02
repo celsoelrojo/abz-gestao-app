@@ -82,6 +82,17 @@ export type ChecklistConclusaoRow = {
   created_at: string
 }
 
+// Override do responsável de uma tarefa só pra um dia — sem linha aqui,
+// vale checklist_tasks.responsavel_nome (o padrão da tarefa).
+export type ChecklistResponsavelDiaRow = {
+  task_id: number
+  data_referencia: string
+  responsavel_id: string
+  responsavel_nome: string
+  alterado_por: string | null
+  alterado_em: string
+}
+
 // Recorte mínimo de checklist_tasks (só campos de agenda, sem título/
 // descrição/responsável) devolvido por checklist_agenda_todos_setores() —
 // usado pra montar a barra "tarefas gerais do estabelecimento" na Home, que
@@ -602,6 +613,7 @@ export type Database = {
       profiles: TableDef<ProfileRow>
       checklist_tasks: TableDef<ChecklistTaskRow>
       checklist_conclusoes: TableDef<ChecklistConclusaoRow>
+      checklist_responsavel_dia: TableDef<ChecklistResponsavelDiaRow>
       printers: TableDef<PrinterRow>
       print_jobs: TableDef<PrintJobRow>
       audit_log: TableDef<AuditLogRow>

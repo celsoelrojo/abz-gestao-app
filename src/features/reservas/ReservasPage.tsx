@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isManager, useAuthStore } from '../../store/authStore'
-import { formatWeekdayLong, weekdayNameForDate } from '../../lib/date'
+import { formatWeekdayLong, isoDate, weekdayNameForDate } from '../../lib/date'
 import { RESERVA_PERIODOS, RESERVA_STATUS, RESERVA_STATUS_BADGE_CLASS, RESERVA_STATUS_LABELS } from './reservaConstants'
 import { groupReservasByData } from './reservaHelpers'
 import { RESERVAS_KEY, useReservaCapacidade, useReservas, useReservasRealtime } from './useReservas'
 import { ReservaFormModal } from './ReservaFormModal'
 import { ReservaCapacidadeModal } from './ReservaCapacidadeModal'
 import type { ReservaPeriodo, ReservaRow, ReservaStatus } from '../../types/database'
+
+// "No dia posterior ao da reserva, ela sai da agenda e vira reserva
+// concluída" (pedido do usuário) — é só um corte por data no client, a
+// reserva continua a mesma linha no banco. `data >= hoje` fica na Agenda;
+// `data < hoje` vai pro histórico ("Concluídas").
+const hojeIso = isoDate(new Date())
 
 export function ReservasPage() {
   const profile = useAuthStore((s) => s.profile)
@@ -18,6 +24,7 @@ export function ReservasPage() {
   const { data: capacidades } = useReservaCapacidade()
   useReservasRealtime()
 
+  const [aba, setAba] = useState<'agenda' | 'concluidas'>('agenda')
   const [busca, setBusca] = useState('')
   const [filtroData, setFiltroData] = useState('')
   const [filtroPeriodo, setFiltroPeriodo] = useState<ReservaPeriodo | 'Todos'>('Todos')
@@ -37,7 +44,15 @@ export function ReservasPage() {
       .filter((r) => filtroStatus === 'Todos' || r.status === filtroStatus)
   }, [reservas, busca, filtroData, filtroPeriodo, filtroStatus])
 
-  const grupos = useMemo(() => groupReservasByData(filtradas), [filtradas])
+  const agenda = useMemo(() => filtradas.filter((r) => r.data >= hojeIso), [filtradas])
+  const concluidas = useMemo(() => filtradas.filter((r) => r.data < hojeIso), [filtradas])
+
+  const grupos = useMemo(() => {
+    const g = groupReservasByData(aba === 'agenda' ? agenda : concluidas)
+    // Concluídas: mais recentes primeiro (o oposto da agenda, que mostra o
+    // próximo dia no topo).
+    return aba === 'concluidas' ? [...g].reverse() : g
+  }, [aba, agenda, concluidas])
 
   function limparFiltros() {
     setBusca('')
@@ -67,6 +82,23 @@ export function ReservasPage() {
         )}
       </div>
 
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        <button
+          type="button"
+          className={`btn ${aba === 'agenda' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setAba('agenda')}
+        >
+          Agenda ({agenda.length})
+        </button>
+        <button
+          type="button"
+          className={`btn ${aba === 'concluidas' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setAba('concluidas')}
+        >
+          Concluídas ({concluidas.length})
+        </button>
+      </div>
+
       <div className="reserva-filters">
         <input type="text" placeholder="Buscar por nome do cliente..." value={busca} onChange={(e) => setBusca(e.target.value)} />
         <input type="date" value={filtroData} onChange={(e) => setFiltroData(e.target.value)} />
@@ -93,7 +125,11 @@ export function ReservasPage() {
         )}
       </div>
 
-      {grupos.length === 0 && <div className="empty-state">Nenhuma reserva encontrada.</div>}
+      {grupos.length === 0 && (
+        <div className="empty-state">
+          {aba === 'concluidas' ? 'Nenhuma reserva concluída.' : 'Nenhuma reserva na agenda.'}
+        </div>
+      )}
 
       {grupos.map((grupo) => {
         const data = new Date(`${grupo.data}T00:00:00`)

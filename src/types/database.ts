@@ -442,6 +442,7 @@ export type EstoqueMovimentoTipo =
   | 'Saída de Estoque'
   | 'Estorno de Retirada'
   | 'Ajuste de Estoque'
+  | 'Entrada por Recebimento'
 export type EstoqueTipoProduto = 'Matéria Prima' | 'Remanufaturado' | 'Pronto para Venda'
 export type EstoqueCondicaoArmazenamento = 'Ambiente' | 'Refrigerado' | 'Congelado'
 
@@ -460,12 +461,45 @@ export type EstoqueItemRow = {
   tipo_produto: EstoqueTipoProduto
   marca: string | null
   volume_padrao: number | null
+  volume_padrao_unidade: EstoqueUnidade | null
+  unidades_por_embalagem: number | null
   condicao_armazenamento: EstoqueCondicaoArmazenamento | null
   prazo_validade: number | null
   unidade_validade: UnidadeValidade | null
   ficha_producao_id: string | null
   created_at: string
   updated_at: string
+}
+
+export type PedidoCompraStatus = 'aberto' | 'recebido'
+
+export type PedidoCompraRow = {
+  id: string
+  fornecedor: string
+  data_entrega: string
+  hora_entrega: string | null
+  espelho_url: string | null
+  observacoes: string | null
+  status: PedidoCompraStatus
+  criado_por: string | null
+  criado_em: string
+  recebido_por: string | null
+  recebido_em: string | null
+}
+
+export type PedidoCompraItemRow = {
+  id: string
+  pedido_id: string
+  estoque_item_id: string | null
+  produto: string
+  categoria: EstoqueCategoria
+  unidade: EstoqueUnidade
+  quantidade: number
+  ordem: number
+  recebido: boolean
+  quantidade_recebida: number | null
+  observacao: string | null
+  created_at: string
 }
 
 export type EstoqueMovimentoRow = {
@@ -627,6 +661,8 @@ export type Database = {
       fichas_producao_lotes: TableDef<FichaProducaoLoteRow>
       estoque_itens: TableDef<EstoqueItemRow>
       estoque_movimentos: TableDef<EstoqueMovimentoRow>
+      pedidos_compra: TableDef<PedidoCompraRow>
+      pedidos_compra_itens: TableDef<PedidoCompraItemRow>
       taxonomias: TableDef<TaxonomiaRow>
       mensagens: TableDef<MensagemRow>
       reservas: TableDef<ReservaRow>
@@ -670,6 +706,7 @@ export type Database = {
         Args: { p_item_id: string; p_nova_quantidade: number; p_observacao?: string | null }
         Returns: EstoqueMovimentoRow
       }
+      finalizar_recebimento: { Args: { p_pedido_id: string }; Returns: undefined }
       reservas_hoje_resumo: {
         Args: Record<string, never>
         Returns: { periodo: ReservaPeriodo; total_pessoas: number }[]

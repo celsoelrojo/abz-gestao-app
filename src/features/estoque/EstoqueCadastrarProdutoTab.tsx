@@ -7,11 +7,15 @@ import { agruparPorCampo, estoqueQuantidadeLabel, ordenarPorTitulo } from './est
 import {
   ESTOQUE_CONDICOES_ARMAZENAMENTO,
   ESTOQUE_TIPOS_PRODUTO,
+  ESTOQUE_UNIDADES_COM_VOLUME_PROPRIO,
+  ESTOQUE_UNIDADES_EMBALAGEM,
   ESTOQUE_UNIDADES_PRODUTO,
+  ESTOQUE_UNIDADE_SIGLA,
   UNIDADES_VALIDADE,
 } from './estoqueConstants'
 import { EditarProdutoModal } from './EditarProdutoModal'
 import { TaxonomiaField } from './TaxonomiaField'
+import { VolumeProprioFields } from './VolumeProprioFields'
 import {
   ESTOQUE_ITENS_KEY,
   TAXONOMIAS_KEY,
@@ -56,6 +60,8 @@ export function EstoqueCadastrarProdutoTab() {
   const [subcategoria, setSubcategoria] = useState('')
   const [unidade, setUnidade] = useState<EstoqueUnidade>('Unidade')
   const [volumePadrao, setVolumePadrao] = useState('')
+  const [volumePadraoUnidade, setVolumePadraoUnidade] = useState<EstoqueUnidade | ''>('')
+  const [unidadesPorEmbalagem, setUnidadesPorEmbalagem] = useState('')
   const [condicaoArmazenamento, setCondicaoArmazenamento] = useState<EstoqueCondicaoArmazenamento | ''>('')
   const [prazoValidade, setPrazoValidade] = useState('')
   const [unidadeValidade, setUnidadeValidade] = useState<UnidadeValidade>('Dias')
@@ -113,11 +119,24 @@ export function EstoqueCadastrarProdutoTab() {
     }
   }
 
+  function handleUnidadeChange(next: EstoqueUnidade) {
+    setUnidade(next)
+    // Limpa os campos condicionais quando muda pra uma unidade que não os usa
+    // (ou de embalagem pra Unidade) — evita salvar valor de tela antiga.
+    setVolumePadrao('')
+    setVolumePadraoUnidade('')
+    setUnidadesPorEmbalagem('')
+  }
+
   const nomeJaExiste = useMemo(
     () => itensDoSetor.some((it) => it.title.toLowerCase() === nome.trim().toLowerCase()),
     [itensDoSetor, nome],
   )
-  const isValid = !!setor && !!nome.trim() && !!unidade && !!condicaoArmazenamento && !nomeJaExiste
+  // Se digitou um volume próprio, precisa dizer a unidade dele.
+  const volumeUnidadeOk =
+    !ESTOQUE_UNIDADES_COM_VOLUME_PROPRIO.includes(unidade) || volumePadrao.trim() === '' || !!volumePadraoUnidade
+  const isValid =
+    !!setor && !!nome.trim() && !!unidade && !!condicaoArmazenamento && !nomeJaExiste && volumeUnidadeOk
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -126,6 +145,8 @@ export function EstoqueCadastrarProdutoTab() {
     setSuccess(null)
     if (!condicaoArmazenamento) return
     setSubmitting(true)
+    const temVolumeProprio = ESTOQUE_UNIDADES_COM_VOLUME_PROPRIO.includes(unidade)
+    const temEmbalagem = ESTOQUE_UNIDADES_EMBALAGEM.includes(unidade)
     try {
       await criarProdutoEstoque({
         categoria: setor,
@@ -135,7 +156,9 @@ export function EstoqueCadastrarProdutoTab() {
         produtoCategoria: categoria.trim() || null,
         subcategoria: subcategoria.trim() || null,
         unidade,
-        volumePadrao: volumePadrao === '' ? null : Number(volumePadrao),
+        volumePadrao: temVolumeProprio && volumePadrao.trim() !== '' ? Number(volumePadrao) : null,
+        volumePadraoUnidade: temVolumeProprio && volumePadrao.trim() !== '' && volumePadraoUnidade ? volumePadraoUnidade : null,
+        unidadesPorEmbalagem: temEmbalagem && unidadesPorEmbalagem.trim() !== '' ? Number(unidadesPorEmbalagem) : null,
         condicaoArmazenamento,
         prazoValidade: isRemanufaturado && prazoValidade !== '' ? Number(prazoValidade) : null,
         unidadeValidade: isRemanufaturado && prazoValidade !== '' ? unidadeValidade : null,
@@ -148,6 +171,8 @@ export function EstoqueCadastrarProdutoTab() {
       setCategoria('')
       setSubcategoria('')
       setVolumePadrao('')
+      setVolumePadraoUnidade('')
+      setUnidadesPorEmbalagem('')
       setCondicaoArmazenamento('')
       setPrazoValidade('')
       setUnidadeValidade('Dias')
@@ -258,29 +283,26 @@ export function EstoqueCadastrarProdutoTab() {
           />
         </div>
 
-        <div className="field-row">
-          <div className="field">
-            <label>Unidade de medida *</label>
-            <select value={unidade} onChange={(e) => setUnidade(e.target.value as EstoqueUnidade)}>
-              {ESTOQUE_UNIDADES_PRODUTO.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Volume padrão</label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={volumePadrao}
-              onChange={(e) => setVolumePadrao(e.target.value)}
-              placeholder="ex.: 1"
-            />
-          </div>
+        <div className="field">
+          <label>Unidade de medida *</label>
+          <select value={unidade} onChange={(e) => handleUnidadeChange(e.target.value as EstoqueUnidade)}>
+            {ESTOQUE_UNIDADES_PRODUTO.map((u) => (
+              <option key={u} value={u}>
+                {u} ({ESTOQUE_UNIDADE_SIGLA[u]})
+              </option>
+            ))}
+          </select>
         </div>
+
+        <VolumeProprioFields
+          unidade={unidade}
+          volumePadrao={volumePadrao}
+          onVolumePadrao={setVolumePadrao}
+          volumePadraoUnidade={volumePadraoUnidade}
+          onVolumePadraoUnidade={setVolumePadraoUnidade}
+          unidadesPorEmbalagem={unidadesPorEmbalagem}
+          onUnidadesPorEmbalagem={setUnidadesPorEmbalagem}
+        />
 
         <div className="field">
           <label>Condição de armazenamento *</label>
@@ -404,6 +426,9 @@ function ProdutosCadastradosLista({
                   </strong>
                   <span>
                     {it.tipo_produto} · {it.unidade}
+                    {it.volume_padrao != null && it.volume_padrao_unidade
+                      ? ` · ${it.unidades_por_embalagem != null ? `${it.unidades_por_embalagem}× ` : ''}${it.volume_padrao}${ESTOQUE_UNIDADE_SIGLA[it.volume_padrao_unidade]}`
+                      : ''}
                     {it.produto_categoria ? ` · ${it.produto_categoria}` : ''}
                     {it.subcategoria ? ` · ${it.subcategoria}` : ''}
                     {it.condicao_armazenamento ? ` · ${it.condicao_armazenamento}` : ''}

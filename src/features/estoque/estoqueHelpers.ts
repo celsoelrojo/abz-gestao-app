@@ -1,4 +1,10 @@
-import type { EstoqueItemRow, EstoqueUnidade } from '../../types/database'
+import type { EstoqueCategoria, EstoqueItemRow, EstoqueUnidade } from '../../types/database'
+import {
+  ESTOQUE_CATEGORIAS,
+  ESTOQUE_UNIDADES_EMBALAGEM,
+  ESTOQUE_UNIDADES_VOLUME_PROPRIO,
+  ESTOQUE_UNIDADE_SIGLA,
+} from './estoqueConstants'
 
 // Espelha estoqueQuantidadeLabel() do protótipo (script.js:321-331) — cada
 // unidade tem seu próprio sufixo/plural; sem correspondência cai no genérico
@@ -12,6 +18,51 @@ export function estoqueQuantidadeLabel(quantidade: number, unidade: EstoqueUnida
   if (unidade === 'Pacote') return `${quantidade} ${quantidade === 1 ? 'pacote' : 'pacotes'}`
   if (unidade === 'Fardo') return `${quantidade} ${quantidade === 1 ? 'fardo' : 'fardos'}`
   return `${quantidade} unidades`
+}
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000
+
+// Nº de unidades individuais em estoque — só faz sentido pra embalagens
+// (Caixa/Pacote/Fardo) com "unidades por embalagem" configurada: aí o saldo
+// está em embalagens, não em unidades soltas. Pra "Unidade" o saldo já É o
+// número de unidades; pra medida base (L/ml/kg/g) não existe "unidade".
+export function estoqueUnidadesIndividuais(
+  item: Pick<EstoqueItemRow, 'quantidade' | 'unidade' | 'unidades_por_embalagem'>,
+): number | null {
+  if (ESTOQUE_UNIDADES_EMBALAGEM.includes(item.unidade) && item.unidades_por_embalagem != null) {
+    return round3(Number(item.quantidade) * Number(item.unidades_por_embalagem))
+  }
+  return null
+}
+
+// Volume/peso total em estoque, na unidade do volume próprio:
+// - medida base (L/ml/kg/g): o próprio saldo já é o volume
+// - Unidade / embalagem com volume próprio: saldo × (unids por embalagem) × volume próprio
+export function estoqueVolumeTotal(
+  item: Pick<
+    EstoqueItemRow,
+    'quantidade' | 'unidade' | 'volume_padrao' | 'volume_padrao_unidade' | 'unidades_por_embalagem'
+  >,
+): { valor: number; unidade: EstoqueUnidade } | null {
+  if (ESTOQUE_UNIDADES_VOLUME_PROPRIO.includes(item.unidade)) {
+    return { valor: round3(Number(item.quantidade)), unidade: item.unidade }
+  }
+  if (item.volume_padrao == null || item.volume_padrao_unidade == null) return null
+  const porEmbalagem = ESTOQUE_UNIDADES_EMBALAGEM.includes(item.unidade)
+    ? Number(item.unidades_por_embalagem ?? 1)
+    : 1
+  return {
+    valor: round3(Number(item.quantidade) * porEmbalagem * Number(item.volume_padrao)),
+    unidade: item.volume_padrao_unidade,
+  }
+}
+
+// "18 L" a partir de 18000 ml — normaliza ml→L e g→kg quando passa de 1000,
+// senão mantém a unidade com a sigla curta.
+export function estoqueVolumeLabel(valor: number, unidade: EstoqueUnidade): string {
+  if (unidade === 'Mililitro' && valor >= 1000) return `${round3(valor / 1000)} L`
+  if (unidade === 'Grama' && valor >= 1000) return `${round3(valor / 1000)} kg`
+  return `${round3(valor)} ${ESTOQUE_UNIDADE_SIGLA[unidade]}`
 }
 
 // item.min != null && quantidade <= min — mesma regra do protótipo
@@ -96,4 +147,36 @@ export function agruparPorCampo<T>(items: T[], getCampo: (item: T) => string | n
 
 export function ordenarPorTitulo<T extends { title: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
+}
+
+// Categorias de produto (produto_categoria) distintas presentes numa lista,
+// em ordem pt-BR — usado pra montar o filtro "Categoria do setor" em Estoque
+// e Retirada. Sentinela pra itens sem categoria.
+export const SEM_CATEGORIA = '__sem_categoria__'
+
+export function categoriasPresentes(items: Pick<EstoqueItemRow, 'produto_categoria'>[]): string[] {
+  const set = new Set<string>()
+  items.forEach((it) => {
+    if (it.produto_categoria) set.add(it.produto_categoria)
+  })
+  return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
+
+// Aplica o filtro de categoria escolhido ('Todas' | SEM_CATEGORIA | nome).
+export function filtrarPorCategoria<T extends Pick<EstoqueItemRow, 'produto_categoria'>>(
+  items: T[],
+  filtroCategoria: string,
+): T[] {
+  if (filtroCategoria === 'Todas') return items
+  if (filtroCategoria === SEM_CATEGORIA) return items.filter((it) => !it.produto_categoria)
+  return items.filter((it) => it.produto_categoria === filtroCategoria)
+}
+
+// Agrupa por setor na ordem canônica de ESTOQUE_CATEGORIAS (Bar, Cozinha,
+// Salão, Material de Limpeza, Outros) — não alfabética como agruparPorCampo.
+// Setor sem nenhum item é omitido.
+export function agruparPorSetor<T extends { categoria: EstoqueCategoria }>(items: T[]): EstoqueGrupo<T>[] {
+  return ESTOQUE_CATEGORIAS.map((cat) => ({ chave: cat, itens: items.filter((it) => it.categoria === cat) })).filter(
+    (g) => g.itens.length > 0,
+  )
 }

@@ -3,8 +3,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { formatDateBR, isoDate } from '../../lib/date'
 import {
   agruparPorCampo,
+  agruparPorSetor,
   estoqueItemCritico,
   estoqueQuantidadeLabel,
+  estoqueUnidadesIndividuais,
+  estoqueVolumeLabel,
+  estoqueVolumeTotal,
   formatValidadeRotulo,
   ordenarPorTitulo,
   validadeInfo,
@@ -50,7 +54,7 @@ export function EstoqueItemList({
       {filtrados.length === 0 && <div className="empty-state">Nenhum produto encontrado.</div>}
       {filtrados.length > 0 &&
         (showSetor ? (
-          agruparPorCampo(filtrados, (it) => it.categoria, '—').map((grupoSetor) => (
+          agruparPorSetor(filtrados).map((grupoSetor) => (
             <div key={grupoSetor.chave} style={{ marginBottom: 24 }}>
               <h3 className="section-label">{grupoSetor.chave}</h3>
               <CategoriaSubcategoriaGrupos itens={grupoSetor.itens} podeAjustar={podeAjustar} onAjustar={setAjustando} />
@@ -125,14 +129,27 @@ function EstoqueItemRowView({
   const proximaValidade = validadeProxima(item, todayIso)
   const rotulo = item.validade ? formatValidadeRotulo(validadeInfo(item.validade, todayIso)) : null
 
+  // Pedido do usuário: mostrar marca, nº de unidades e volume total no card.
+  const unidadesIndividuais = estoqueUnidadesIndividuais(item)
+  const volumeTotal = item.unidade === 'Litro' || item.unidade === 'Mililitro' || item.unidade === 'Quilo' || item.unidade === 'Grama'
+    ? null // medida base: o "X em estoque" acima já É o volume
+    : estoqueVolumeTotal(item)
+  const totais: string[] = []
+  if (unidadesIndividuais != null) totais.push(`${unidadesIndividuais} unidades`)
+  if (volumeTotal) totais.push(`${estoqueVolumeLabel(volumeTotal.valor, volumeTotal.unidade)} no total`)
+
   return (
     <div className={`manage-row ${critico ? 'content-row-critico' : ''}`}>
       <div className="manage-row-info">
-        <strong>{item.title}</strong>
-        <span>
+        <strong>
+          {item.title}
+          {item.marca ? ` — ${item.marca}` : ''}
+        </strong>
+        <span style={{ display: 'block' }}>
           {estoqueQuantidadeLabel(item.quantidade, item.unidade)} em estoque · {item.categoria}
           {item.validade ? ` · Validade: ${formatDateBR(item.validade)}` : ''}
         </span>
+        {totais.length > 0 && <span style={{ display: 'block' }}>{totais.join(' · ')}</span>}
         <div className="account-badges">
           {critico && <span className="badge-critico">Crítico</span>}
           {proximaValidade && (

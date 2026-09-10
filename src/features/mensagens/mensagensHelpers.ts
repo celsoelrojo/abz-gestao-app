@@ -18,6 +18,14 @@ export function freelancersResumoTexto(almoco: number, noite: number): string | 
   return `Freelancers no Almoço: ${almoco}. Freelancers na Noite: ${noite}.`
 }
 
+// Aviso "Mercadoria a receber hoje" — pedidos_compra com data_entrega = hoje
+// e status 'aberto'. Some quando alguém finaliza o recebimento.
+export function pedidosAReceberTexto(fornecedores: string[]): string | null {
+  if (!fornecedores.length) return null
+  if (fornecedores.length === 1) return `Mercadoria a receber hoje: entrega de ${fornecedores[0]}.`
+  return `Mercadoria a receber hoje: ${fornecedores.length} entregas (${fornecedores.join(', ')}).`
+}
+
 // Espelha estoqueCriticoAlertaTexto() (script.js:2984-2997).
 export function estoqueCriticoTexto(titulos: string[]): string | null {
   if (!titulos.length) return null

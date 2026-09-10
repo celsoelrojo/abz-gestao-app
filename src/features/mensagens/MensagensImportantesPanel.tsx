@@ -4,7 +4,14 @@ import { isoDate } from '../../lib/date'
 import { estoqueItemCritico, validadeProxima } from '../estoque/estoqueHelpers'
 import { visibleCategorias } from '../estoque/estoqueAccess'
 import { useEstoqueItens } from '../estoque/useEstoque'
-import { estoqueCriticoTexto, estoqueValidadeTexto, freelancersResumoTexto, reservasResumoTexto } from './mensagensHelpers'
+import { usePedidosAReceberHoje, usePedidosCompraRealtime } from '../estoque/usePedidosCompra'
+import {
+  estoqueCriticoTexto,
+  estoqueValidadeTexto,
+  freelancersResumoTexto,
+  pedidosAReceberTexto,
+  reservasResumoTexto,
+} from './mensagensHelpers'
 import { useFreelancersResumoHoje, useMensagens, useMensagensRealtime, useReservasResumoHoje } from './useMensagens'
 import { ManageMensagensModal } from './ManageMensagensModal'
 
@@ -26,6 +33,8 @@ export function MensagensImportantesPanel() {
   const { data: reservasResumo } = useReservasResumoHoje()
   const { data: freelancersResumo } = useFreelancersResumoHoje(isCozinha)
   const { data: itens } = useEstoqueItens()
+  const { data: pedidosHoje } = usePedidosAReceberHoje()
+  usePedidosCompraRealtime()
 
   const setores = useMemo(() => visibleCategorias(profile), [profile])
 
@@ -46,10 +55,17 @@ export function MensagensImportantesPanel() {
   const reservasText = reservasResumo ? reservasResumoTexto(reservasResumo.almoco, reservasResumo.noite) : null
   const freelancersText =
     isCozinha && freelancersResumo ? freelancersResumoTexto(freelancersResumo.almoco, freelancersResumo.noite) : null
+  const pedidosReceberText = pedidosHoje ? pedidosAReceberTexto(pedidosHoje.map((p) => p.fornecedor)) : null
 
   const [manageOpen, setManageOpen] = useState(false)
 
-  const hasAutoAlert = !!(estoqueCriticoText || estoqueValidadeText || reservasText || freelancersText)
+  const hasAutoAlert = !!(
+    estoqueCriticoText ||
+    estoqueValidadeText ||
+    pedidosReceberText ||
+    reservasText ||
+    freelancersText
+  )
   const hasContent = hasAutoAlert || (mensagens && mensagens.length > 0)
 
   return (
@@ -76,6 +92,14 @@ export function MensagensImportantesPanel() {
             <div className="message-item-top">
               <div className="message-item-content">{estoqueValidadeText}</div>
               <span className="message-destino-badge">Validade</span>
+            </div>
+          </li>
+        )}
+        {pedidosReceberText && (
+          <li className="message-item message-item-reserva">
+            <div className="message-item-top">
+              <div className="message-item-content">{pedidosReceberText}</div>
+              <span className="message-destino-badge">Receber</span>
             </div>
           </li>
         )}

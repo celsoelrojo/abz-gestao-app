@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabaseClient'
 import { visibleCategorias } from './estoqueAccess'
-import { agruparPorCampo, estoqueItemCritico, ordenarPorTitulo } from './estoqueHelpers'
+import { agruparPorCampo, agruparPorSetor, estoqueItemCritico, ordenarPorTitulo } from './estoqueHelpers'
 import { ESTOQUE_ITENS_KEY, useEstoqueItens } from './useEstoque'
 import type { EstoqueItemRow } from '../../types/database'
 
@@ -13,10 +13,13 @@ export function EstoqueLimitesTab() {
   const { data: itens, isLoading } = useEstoqueItens()
 
   const itensEscopo = useMemo(() => (itens ?? []).filter((it) => setores.includes(it.categoria)), [itens, setores])
-  const grupos = useMemo(
-    () => agruparPorCampo(itensEscopo, (it) => it.produto_categoria, 'Sem categoria'),
-    [itensEscopo],
-  )
+  // Pedido do usuário: separar por setor (Bar/Cozinha/Salão/Material de
+  // Limpeza/Outros) — e, dentro de cada setor, seguir agrupado por categoria
+  // de produto como já era. O cabeçalho de setor só aparece pra quem vê mais
+  // de um setor (Administrador) — Gestor de setor só enxerga o próprio, aí
+  // repetir o nível não agrega.
+  const mostrarSetor = setores.length > 1
+  const gruposSetor = useMemo(() => agruparPorSetor(itensEscopo), [itensEscopo])
 
   if (isLoading) return <div className="empty-state">Carregando…</div>
 
@@ -25,15 +28,24 @@ export function EstoqueLimitesTab() {
       <h3 className="page-title" style={{ marginBottom: 16 }}>
         Estoque Mínimo e Máximo
       </h3>
-      {grupos.length === 0 && <div className="empty-state">Nenhum produto cadastrado.</div>}
-      {grupos.map((grupo) => (
-        <div key={grupo.chave} style={{ marginBottom: 20 }}>
-          <h4 className="section-label">{grupo.chave}</h4>
-          <div className="manage-list">
-            {ordenarPorTitulo(grupo.itens).map((item) => (
-              <LimitesRow key={item.id} item={item} />
-            ))}
-          </div>
+      {gruposSetor.length === 0 && <div className="empty-state">Nenhum produto cadastrado.</div>}
+      {gruposSetor.map((grupoSetor) => (
+        <div key={grupoSetor.chave} style={{ marginBottom: 28 }}>
+          {mostrarSetor && (
+            <h3 className="section-label" style={{ fontSize: '1rem', marginBottom: 10 }}>
+              {grupoSetor.chave}
+            </h3>
+          )}
+          {agruparPorCampo(grupoSetor.itens, (it) => it.produto_categoria, 'Sem categoria').map((grupo) => (
+            <div key={grupo.chave} style={{ marginBottom: 20 }}>
+              <h4 className="section-label">{grupo.chave}</h4>
+              <div className="manage-list">
+                {ordenarPorTitulo(grupo.itens).map((item) => (
+                  <LimitesRow key={item.id} item={item} />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ))}
     </div>

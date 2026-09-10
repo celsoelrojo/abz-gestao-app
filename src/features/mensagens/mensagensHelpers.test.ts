@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { estoqueCriticoTexto, estoqueValidadeTexto, freelancersResumoTexto, reservasResumoTexto } from './mensagensHelpers'
+import {
+  estoqueCriticoTexto,
+  estoqueValidadeTexto,
+  freelancersResumoTexto,
+  pedidosAReceberTexto,
+  reservasResumoTexto,
+} from './mensagensHelpers'
 
 describe('reservasResumoTexto', () => {
   it('null quando não há reservas em nenhum período', () => {
@@ -37,6 +43,20 @@ describe('estoqueCriticoTexto', () => {
   })
   it('plural com vários itens, listados', () => {
     expect(estoqueCriticoTexto(['Gin', 'Vodka'])).toBe('Estoque crítico: 2 itens atingiram o estoque mínimo (Gin, Vodka).')
+  })
+})
+
+describe('pedidosAReceberTexto', () => {
+  it('null quando não há entregas hoje', () => {
+    expect(pedidosAReceberTexto([])).toBeNull()
+  })
+  it('singular com um fornecedor', () => {
+    expect(pedidosAReceberTexto(['Distribuidora X'])).toBe('Mercadoria a receber hoje: entrega de Distribuidora X.')
+  })
+  it('plural, lista os fornecedores', () => {
+    expect(pedidosAReceberTexto(['Distribuidora X', 'Hortifruti Y'])).toBe(
+      'Mercadoria a receber hoje: 2 entregas (Distribuidora X, Hortifruti Y).',
+    )
   })
 })
 

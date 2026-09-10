@@ -6,7 +6,14 @@ import { isoDate } from '../../lib/date'
 import { supabase } from '../../lib/supabaseClient'
 import { visibleCategorias } from './estoqueAccess'
 import { MOTIVOS_RETIRADA } from './estoqueConstants'
-import { agruparPorCampo, estoqueQuantidadeLabel, ordenarPorTitulo } from './estoqueHelpers'
+import {
+  agruparPorCampo,
+  categoriasPresentes,
+  estoqueQuantidadeLabel,
+  filtrarPorCategoria,
+  ordenarPorTitulo,
+} from './estoqueHelpers'
+import { CategoriaFiltroSelect } from './CategoriaFiltroSelect'
 import { ESTOQUE_ITENS_KEY, ESTOQUE_MOVIMENTOS_KEY, useEstoqueItens, useEstoqueMovimentos } from './useEstoque'
 import { EstoqueItemList } from './EstoqueItemList'
 import type { EstoqueCategoria, EstoqueMovimentoRow, MotivoRetirada } from '../../types/database'
@@ -19,6 +26,7 @@ export function EstoqueRetiradaTab() {
   const locked = admin ? null : (profile?.setor ?? null)
 
   const [setor, setSetor] = useState<EstoqueCategoria>(locked ?? setores[0] ?? 'Bar')
+  const [filtroCategoria, setFiltroCategoria] = useState('Todas')
   const [busca, setBusca] = useState('')
   const [itemId, setItemId] = useState('')
   const [quantidade, setQuantidade] = useState('')
@@ -30,10 +38,17 @@ export function EstoqueRetiradaTab() {
   const { data: movimentos } = useEstoqueMovimentos()
 
   const itensDoSetor = useMemo(() => (itens ?? []).filter((it) => it.categoria === setor), [itens, setor])
+  const categoriaOptions = useMemo(() => categoriasPresentes(itensDoSetor), [itensDoSetor])
+  const temSemCategoria = useMemo(() => itensDoSetor.some((it) => !it.produto_categoria), [itensDoSetor])
+  const itensDoSetorECategoria = useMemo(
+    () => filtrarPorCategoria(itensDoSetor, filtroCategoria),
+    [itensDoSetor, filtroCategoria],
+  )
+
   const itensFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase()
-    return termo ? itensDoSetor.filter((it) => it.title.toLowerCase().includes(termo)) : itensDoSetor
-  }, [itensDoSetor, busca])
+    return termo ? itensDoSetorECategoria.filter((it) => it.title.toLowerCase().includes(termo)) : itensDoSetorECategoria
+  }, [itensDoSetorECategoria, busca])
 
   const produtoGrupos = useMemo(() => {
     const grupos = agruparPorCampo(itensFiltrados, (it) => it.produto_categoria, 'Sem categoria')
@@ -47,7 +62,14 @@ export function EstoqueRetiradaTab() {
   const isValid = !!item && quantidadeNum > 0 && !!motivo && !excedeSaldo
 
   const historico = useMemo(
-    () => (movimentos ?? []).filter((m) => m.categoria === setor && m.tipo !== 'Entrada Manual' && m.tipo !== 'Entrada por Produção'),
+    () =>
+      (movimentos ?? []).filter(
+        (m) =>
+          m.categoria === setor &&
+          m.tipo !== 'Entrada Manual' &&
+          m.tipo !== 'Entrada por Produção' &&
+          m.tipo !== 'Entrada por Recebimento',
+      ),
     [movimentos, setor],
   )
 
@@ -109,12 +131,13 @@ export function EstoqueRetiradaTab() {
 
       <div className="field-row">
         {!locked && (
-          <div className="field" style={{ maxWidth: 220 }}>
+          <div className="field" style={{ maxWidth: 200 }}>
             <label>Setor</label>
             <select
               value={setor}
               onChange={(e) => {
                 setSetor(e.target.value as EstoqueCategoria)
+                setFiltroCategoria('Todas')
                 setItemId('')
               }}
             >
@@ -126,7 +149,17 @@ export function EstoqueRetiradaTab() {
             </select>
           </div>
         )}
-        <div className="field" style={{ flex: 1 }}>
+        <CategoriaFiltroSelect
+          value={filtroCategoria}
+          onChange={(v) => {
+            setFiltroCategoria(v)
+            setItemId('')
+          }}
+          categorias={categoriaOptions}
+          temSemCategoria={temSemCategoria}
+          style={{ maxWidth: 200 }}
+        />
+        <div className="field" style={{ flex: 1, minWidth: 180 }}>
           <label>Buscar produto</label>
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome do produto..." />
         </div>
@@ -176,7 +209,7 @@ export function EstoqueRetiradaTab() {
       </form>
 
       <h4 className="section-label">Itens do setor</h4>
-      <EstoqueItemList itens={itensDoSetor} showSetor={false} search={busca} />
+      <EstoqueItemList itens={itensDoSetorECategoria} showSetor={false} search={busca} />
 
       <RetiradaHistorico historico={historico} admin={admin} onEstornar={handleEstornar} />
     </div>

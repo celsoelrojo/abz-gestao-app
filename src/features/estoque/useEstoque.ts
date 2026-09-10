@@ -138,6 +138,8 @@ export async function criarProdutoEstoque(input: {
   subcategoria: string | null
   unidade: EstoqueUnidade
   volumePadrao: number | null
+  volumePadraoUnidade: EstoqueUnidade | null
+  unidadesPorEmbalagem: number | null
   condicaoArmazenamento: EstoqueCondicaoArmazenamento
   prazoValidade: number | null
   unidadeValidade: UnidadeValidade | null
@@ -155,6 +157,8 @@ export async function criarProdutoEstoque(input: {
       tipo_produto: input.tipoProduto,
       marca: input.marca,
       volume_padrao: input.volumePadrao,
+      volume_padrao_unidade: input.volumePadraoUnidade,
+      unidades_por_embalagem: input.unidadesPorEmbalagem,
       condicao_armazenamento: input.condicaoArmazenamento,
       prazo_validade: input.prazoValidade,
       unidade_validade: input.unidadeValidade,
@@ -184,6 +188,8 @@ export async function atualizarProdutoEstoque(
     subcategoria: string | null
     unidade: EstoqueUnidade
     volumePadrao: number | null
+    volumePadraoUnidade: EstoqueUnidade | null
+    unidadesPorEmbalagem: number | null
     condicaoArmazenamento: EstoqueCondicaoArmazenamento
     prazoValidade: number | null
     unidadeValidade: UnidadeValidade | null
@@ -200,6 +206,8 @@ export async function atualizarProdutoEstoque(
       tipo_produto: input.tipoProduto,
       marca: input.marca,
       volume_padrao: input.volumePadrao,
+      volume_padrao_unidade: input.volumePadraoUnidade,
+      unidades_por_embalagem: input.unidadesPorEmbalagem,
       condicao_armazenamento: input.condicaoArmazenamento,
       prazo_validade: input.prazoValidade,
       unidade_validade: input.unidadeValidade,

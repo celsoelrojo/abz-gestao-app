@@ -1,7 +1,16 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ESTOQUE_CONDICOES_ARMAZENAMENTO, ESTOQUE_TIPOS_PRODUTO, ESTOQUE_UNIDADES_PRODUTO, UNIDADES_VALIDADE } from './estoqueConstants'
+import {
+  ESTOQUE_CONDICOES_ARMAZENAMENTO,
+  ESTOQUE_TIPOS_PRODUTO,
+  ESTOQUE_UNIDADES_COM_VOLUME_PROPRIO,
+  ESTOQUE_UNIDADES_EMBALAGEM,
+  ESTOQUE_UNIDADES_PRODUTO,
+  ESTOQUE_UNIDADE_SIGLA,
+  UNIDADES_VALIDADE,
+} from './estoqueConstants'
 import { TaxonomiaField } from './TaxonomiaField'
+import { VolumeProprioFields } from './VolumeProprioFields'
 import {
   ESTOQUE_ITENS_KEY,
   TAXONOMIAS_KEY,
@@ -34,6 +43,8 @@ export function EditarProdutoModal({ item, onClose, onSaved }: { item: EstoqueIt
   const [subcategoria, setSubcategoria] = useState(item.subcategoria ?? '')
   const [unidade, setUnidade] = useState<EstoqueUnidade>(item.unidade)
   const [volumePadrao, setVolumePadrao] = useState(item.volume_padrao?.toString() ?? '')
+  const [volumePadraoUnidade, setVolumePadraoUnidade] = useState<EstoqueUnidade | ''>(item.volume_padrao_unidade ?? '')
+  const [unidadesPorEmbalagem, setUnidadesPorEmbalagem] = useState(item.unidades_por_embalagem?.toString() ?? '')
   const [condicaoArmazenamento, setCondicaoArmazenamento] = useState<EstoqueCondicaoArmazenamento | ''>(
     item.condicao_armazenamento ?? '',
   )
@@ -80,13 +91,24 @@ export function EditarProdutoModal({ item, onClose, onSaved }: { item: EstoqueIt
     }
   }
 
-  const isValid = !!nome.trim() && !!unidade && !!condicaoArmazenamento
+  function handleUnidadeChange(next: EstoqueUnidade) {
+    setUnidade(next)
+    setVolumePadrao('')
+    setVolumePadraoUnidade('')
+    setUnidadesPorEmbalagem('')
+  }
+
+  const volumeUnidadeOk =
+    !ESTOQUE_UNIDADES_COM_VOLUME_PROPRIO.includes(unidade) || volumePadrao.trim() === '' || !!volumePadraoUnidade
+  const isValid = !!nome.trim() && !!unidade && !!condicaoArmazenamento && volumeUnidadeOk
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!isValid || !condicaoArmazenamento) return
     setError(null)
     setSubmitting(true)
+    const temVolumeProprio = ESTOQUE_UNIDADES_COM_VOLUME_PROPRIO.includes(unidade)
+    const temEmbalagem = ESTOQUE_UNIDADES_EMBALAGEM.includes(unidade)
     try {
       await atualizarProdutoEstoque(item.id, {
         title: nome,
@@ -95,7 +117,9 @@ export function EditarProdutoModal({ item, onClose, onSaved }: { item: EstoqueIt
         produtoCategoria: categoria.trim() || null,
         subcategoria: subcategoria.trim() || null,
         unidade,
-        volumePadrao: volumePadrao === '' ? null : Number(volumePadrao),
+        volumePadrao: temVolumeProprio && volumePadrao.trim() !== '' ? Number(volumePadrao) : null,
+        volumePadraoUnidade: temVolumeProprio && volumePadrao.trim() !== '' && volumePadraoUnidade ? volumePadraoUnidade : null,
+        unidadesPorEmbalagem: temEmbalagem && unidadesPorEmbalagem.trim() !== '' ? Number(unidadesPorEmbalagem) : null,
         condicaoArmazenamento,
         prazoValidade: isRemanufaturado && prazoValidade !== '' ? Number(prazoValidade) : null,
         unidadeValidade: isRemanufaturado && prazoValidade !== '' ? unidadeValidade : null,
@@ -172,22 +196,26 @@ export function EditarProdutoModal({ item, onClose, onSaved }: { item: EstoqueIt
             />
           </div>
 
-          <div className="field-row">
-            <div className="field">
-              <label>Unidade de medida *</label>
-              <select value={unidade} onChange={(e) => setUnidade(e.target.value as EstoqueUnidade)}>
-                {ESTOQUE_UNIDADES_PRODUTO.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>Volume padrão</label>
-              <input type="number" min="0" step="any" value={volumePadrao} onChange={(e) => setVolumePadrao(e.target.value)} />
-            </div>
+          <div className="field">
+            <label>Unidade de medida *</label>
+            <select value={unidade} onChange={(e) => handleUnidadeChange(e.target.value as EstoqueUnidade)}>
+              {ESTOQUE_UNIDADES_PRODUTO.map((u) => (
+                <option key={u} value={u}>
+                  {u} ({ESTOQUE_UNIDADE_SIGLA[u]})
+                </option>
+              ))}
+            </select>
           </div>
+
+          <VolumeProprioFields
+            unidade={unidade}
+            volumePadrao={volumePadrao}
+            onVolumePadrao={setVolumePadrao}
+            volumePadraoUnidade={volumePadraoUnidade}
+            onVolumePadraoUnidade={setVolumePadraoUnidade}
+            unidadesPorEmbalagem={unidadesPorEmbalagem}
+            onUnidadesPorEmbalagem={setUnidadesPorEmbalagem}
+          />
 
           <div className="field">
             <label>Condição de armazenamento *</label>

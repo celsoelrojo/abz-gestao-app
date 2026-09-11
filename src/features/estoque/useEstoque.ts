@@ -68,19 +68,75 @@ export function taxonomiaValores(taxonomias: TaxonomiaRow[], setor: string, tipo
 
 // Registra categoria/subcategoria novas na tabela de sugestões — ignora
 // silenciosamente se já existir (unique constraint faz esse trabalho; 23505
-// = unique_violation).
+// = unique_violation). categoriaPai vincula a subcategoria a uma categoria
+// específica (pedido do usuário) — null quando nenhuma categoria estava
+// escolhida na hora de adicionar.
 export async function registrarTaxonomia(
   modulo: 'estoque' | 'ficha_tecnica' | 'ficha_producao' | 'pop',
   setor: string,
   categoria: string,
   subcategoria: string,
+  categoriaPai: string | null = null,
 ) {
-  const rows: { modulo: string; setor: string; tipo: 'categoria' | 'subcategoria'; valor: string }[] = []
-  if (categoria.trim()) rows.push({ modulo, setor, tipo: 'categoria', valor: categoria.trim() })
-  if (subcategoria.trim()) rows.push({ modulo, setor, tipo: 'subcategoria', valor: subcategoria.trim() })
+  const rows: {
+    modulo: string
+    setor: string
+    tipo: 'categoria' | 'subcategoria'
+    valor: string
+    categoria_pai: string | null
+  }[] = []
+  if (categoria.trim()) rows.push({ modulo, setor, tipo: 'categoria', valor: categoria.trim(), categoria_pai: null })
+  if (subcategoria.trim())
+    rows.push({
+      modulo,
+      setor,
+      tipo: 'subcategoria',
+      valor: subcategoria.trim(),
+      categoria_pai: categoriaPai?.trim() || null,
+    })
   if (!rows.length) return
   const { error } = await supabase.from('taxonomias').insert(rows)
   if (error && error.code !== '23505') throw error
+}
+
+// Move uma subcategoria pra outra categoria mãe (ou pra "sem categoria",
+// null) — botão em "Gerenciar categorias". UPDATE liberado pela policy
+// taxonomias_manager_update (migration 0043).
+export async function reatribuirCategoriaPai(id: string, categoriaPai: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('taxonomias')
+    .update({ categoria_pai: categoriaPai?.trim() || null })
+    .eq('id', id)
+  if (error) throw error
+}
+
+// Ao excluir uma categoria, solta as subcategorias que estavam ligadas a ela
+// (viram "sem categoria" em vez de apontar pra um nome que não existe mais).
+export async function soltarSubcategoriasDe(setor: string, categoriaValor: string): Promise<void> {
+  const { error } = await supabase
+    .from('taxonomias')
+    .update({ categoria_pai: null })
+    .eq('modulo', 'estoque')
+    .eq('setor', setor)
+    .eq('tipo', 'subcategoria')
+    .eq('categoria_pai', categoriaValor)
+  if (error) throw error
+}
+
+// Apaga uma sugestão de categoria/subcategoria (botão "Gerenciar categorias"
+// em Cadastrar Produto) — só Administrador (RLS taxonomias_admin_delete,
+// migration 0041). Não mexe em produto nenhum: o valor é texto livre neles.
+export async function excluirTaxonomia(id: string): Promise<void> {
+  const { error } = await supabase.from('taxonomias').delete().eq('id', id)
+  if (error) throw error
+}
+
+// Renomeia uma categoria/subcategoria — repontua os produtos do setor que
+// tinham o valor antigo (RPC renomear_taxonomia, migration 0042). Se o nome
+// novo já existir, os dois viram um só. Só Administrador.
+export async function renomearTaxonomia(id: string, novo: string): Promise<void> {
+  const { error } = await supabase.rpc('renomear_taxonomia', { p_id: id, p_novo: novo })
+  if (error) throw error
 }
 
 // Realtime: qualquer INSERT/UPDATE/DELETE em itens ou movimentos invalida o

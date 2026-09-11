@@ -28,6 +28,12 @@ const OVERRIDES: Partial<Record<string, { strokeWidth?: number; scale?: number }
   'fichas-tecnicas': { scale: 1.7 },
   'fichas-producao': { scale: 1.7 },
   pops: { scale: 1.7 },
+  // Submenu de Fichas de Produção (mesmo motivo do bloco "estoque-*" acima):
+  // cópias dedicadas pra poder dobrar o tamanho só ali, sem afetar o card
+  // "Fichas de Produção" da Home, que usa a chave "fichas-producao" original.
+  'fichas-producao-hub': { scale: 2 },
+  'fichas-producao-calculadora': { scale: 2 },
+  'fichas-producao-gerenciar': { scale: 2 },
   mapas: { scale: 1.7 },
   freelancer: { scale: 1.7 },
   accounts: { scale: 1.7 },
@@ -124,6 +130,43 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M3.5 9.5h17M8 3v4M16 3v4" />
     </>
   ),
+  // Ícones pequenos do submenu de Reservas (pedido do usuário: Agenda / Nova
+  // reserva / Concluídas / Capacidade em cima da lista) — mesma agenda-base
+  // do ícone "reservas" acima, com uma marca no canto indicando a ação
+  // (mesma lógica do "+" em "estoque-cadastrar": forma base + marca = ação).
+  // "reservas-agenda" é a cópia lisa, sem marca — mesmo motivo de
+  // "estoque-atual": cópia dedicada pra não herdar o scale:1.7 do ícone
+  // "reservas" original (usado na Home).
+  'reservas-agenda': (
+    <>
+      <rect x="3" y="5.5" width="14" height="14.5" rx="2" />
+      <path d="M3 9.5h14M7 3v4M13 3v4" />
+    </>
+  ),
+  'reservas-nova': (
+    <>
+      <rect x="3" y="5.5" width="14" height="14.5" rx="2" />
+      <path d="M3 9.5h14M7 3v4M13 3v4" />
+      <path d="M19 14v6M16 17h6" />
+    </>
+  ),
+  'reservas-concluidas': (
+    <>
+      <rect x="3" y="5.5" width="14" height="14.5" rx="2" />
+      <path d="M3 9.5h14M7 3v4M13 3v4" />
+      <path d="M15.5 16l2 2 4-4.5" />
+    </>
+  ),
+  // Capacidade: mesa (círculo) vista de cima com 4 lugares ao redor.
+  'reservas-capacidade': (
+    <>
+      <circle cx="12" cy="12" r="5" />
+      <rect x="10.4" y="2.2" width="3.2" height="3.2" rx="0.8" />
+      <rect x="10.4" y="18.6" width="3.2" height="3.2" rx="0.8" />
+      <rect x="2.2" y="10.4" width="3.2" height="3.2" rx="0.8" />
+      <rect x="18.6" y="10.4" width="3.2" height="3.2" rx="0.8" />
+    </>
+  ),
   // Pedido do usuário: garfo (Cozinha) + taça de martini (Bar) dentro de um
   // círculo, simulando um prato — mesma composição de referência
   // (garfo/colher dentro de um círculo), adaptada pro traço em linha do
@@ -157,6 +200,44 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M9 11h6M9 15h6M9 7h3" />
     </>
   ),
+  // Cópia idêntica de "fichas-producao" (a panela) — usada só pelo tile
+  // "Fichas de Produção" do submenu do próprio módulo, pra poder dobrar de
+  // tamanho (mesmo motivo de "estoque-atual" acima) sem afetar o card da Home.
+  'fichas-producao-hub': (
+    <>
+      <path d="M4.5 10h15" />
+      <path d="M5.5 10v5.5a3 3 0 0 0 3 3h7a3 3 0 0 0 3-3V10" />
+      <path d="M2.5 9.5h2M19.5 9.5h2" />
+      <path d="M12 8.3V5.5" />
+      <circle cx="12" cy="4.8" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Calculadora de Produção (pedido do usuário: submódulo próprio, separado
+  // da ficha): corpo + visor + grade de botões, no mesmo traço em linha do
+  // resto do set.
+  'fichas-producao-calculadora': (
+    <>
+      <rect x="5" y="2.5" width="14" height="19" rx="2.2" />
+      <rect x="7.2" y="5" width="9.6" height="3.4" rx="0.8" />
+      <circle cx="8.6" cy="13" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="13" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15.4" cy="13" r="1" fill="currentColor" stroke="none" />
+      <circle cx="8.6" cy="17.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="17.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15.4" cy="17.5" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Gerenciar Fichas de Produção: prancheta (cadastro/edição) com um lápis
+  // no canto — mesma lógica do "+" em "estoque-cadastrar" (forma base +
+  // marca no canto indicando a ação de editar).
+  'fichas-producao-gerenciar': (
+    <>
+      <path d="M7.5 5h7a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2Z" />
+      <path d="M9 3.5h4a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z" />
+      <path d="M8 11h5M8 14.5h5" />
+      <path d="M16 15l3.3-3.3 1.6 1.6L17.6 16.6H16z" />
+    </>
+  ),
   mapas: (
     <>
       <path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2Z" />
@@ -168,6 +249,37 @@ const PATHS: Record<string, ReactNode> = {
       <circle cx="9" cy="8" r="3" />
       <path d="M3.5 19c.7-3 3-4.5 5.5-4.5s4.8 1.5 5.5 4.5" />
       <path d="M16 4.5c1.4.4 2.4 1.7 2.4 3.2s-1 2.8-2.4 3.2M18.5 14.8c1.6.6 2.7 1.9 3.1 4.2" />
+    </>
+  ),
+  // Ícones pequenos do submenu de Freelancer (pedido do usuário: Cadastro /
+  // Escala acima da lista) — mesma lógica de marca-no-canto de
+  // "reservas-nova"/"estoque-cadastrar": a silhueta única de "freelancer"
+  // (sem a segunda pessoa menor, que só faz sentido no tile grande da Home)
+  // com um "+" indicando cadastro.
+  'freelancer-cadastro': (
+    <>
+      <circle cx="9" cy="9" r="3.4" />
+      <path d="M3 19c.8-3.3 3.3-5 6-5s5.2 1.7 6 5" />
+      <path d="M19 3v6" />
+      <path d="M16 6h6" />
+    </>
+  ),
+  // Escala: mesma agenda-base de "reservas-agenda", com duas linhas dentro
+  // sugerindo os turnos listados.
+  'freelancer-escala': (
+    <>
+      <rect x="3" y="5.5" width="14" height="14.5" rx="2" />
+      <path d="M3 9.5h14M7 3v4M13 3v4" />
+      <path d="M6.5 14h3M6.5 17h5" />
+    </>
+  ),
+  // Nova Escala: mesma agenda-base, com o "+" no canto em vez das linhas de
+  // turno — mesmo par visual de "reservas-agenda"/"reservas-nova".
+  'freelancer-nova-escala': (
+    <>
+      <rect x="3" y="5.5" width="14" height="14.5" rx="2" />
+      <path d="M3 9.5h14M7 3v4M13 3v4" />
+      <path d="M19 14v6M16 17h6" />
     </>
   ),
   accounts: (

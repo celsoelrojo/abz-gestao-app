@@ -6,10 +6,12 @@ import {
   formatValidadeRotulo,
   ordenarPorTitulo,
   precisaComprar,
+  subcategoriasDaCategoria,
   sugestaoCompra,
   validadeInfo,
   validadeProxima,
 } from './estoqueHelpers'
+import type { TaxonomiaRow } from '../../types/database'
 
 describe('estoqueQuantidadeLabel', () => {
   it('formata litro/mililitro/quilo/grama com sufixo colado', () => {
@@ -113,5 +115,42 @@ describe('ordenarPorTitulo', () => {
     const sorted = ordenarPorTitulo(items)
     expect(sorted.map((i) => i.title)).toEqual(['Água', 'Cerveja', 'Vodka'])
     expect(items.map((i) => i.title)).toEqual(['Vodka', 'Cerveja', 'Água'])
+  })
+})
+
+describe('subcategoriasDaCategoria', () => {
+  const tax = (over: Partial<TaxonomiaRow>): TaxonomiaRow => ({
+    id: Math.random().toString(36).slice(2),
+    modulo: 'estoque',
+    setor: 'Bar',
+    tipo: 'subcategoria',
+    valor: 'x',
+    categoria_pai: null,
+    ...over,
+  })
+  const dados: TaxonomiaRow[] = [
+    tax({ valor: 'Destilada', categoria_pai: 'Bebidas alcoólicas' }),
+    tax({ valor: 'Amari', categoria_pai: 'Bebidas alcoólicas' }),
+    tax({ valor: 'Licores', categoria_pai: 'Bebidas alcoólicas' }),
+    tax({ valor: 'Refrigerante', categoria_pai: 'Soft' }),
+    tax({ valor: 'Órfã', categoria_pai: null }),
+    tax({ valor: 'Bebidas alcoólicas', tipo: 'categoria', categoria_pai: null }),
+    tax({ valor: 'Vinhos', categoria_pai: 'Bebidas alcoólicas', setor: 'Cozinha' }),
+  ]
+
+  it('devolve só as subcategorias ligadas à categoria escolhida, em ordem pt-BR', () => {
+    expect(subcategoriasDaCategoria(dados, 'Bar', 'Bebidas alcoólicas')).toEqual(['Amari', 'Destilada', 'Licores'])
+  })
+
+  it('respeita o setor', () => {
+    expect(subcategoriasDaCategoria(dados, 'Cozinha', 'Bebidas alcoólicas')).toEqual(['Vinhos'])
+  })
+
+  it('sem categoria escolhida, devolve as ainda não vinculadas (categoria_pai null)', () => {
+    expect(subcategoriasDaCategoria(dados, 'Bar', '')).toEqual(['Órfã'])
+  })
+
+  it('categoria sem subcategorias vinculadas devolve lista vazia', () => {
+    expect(subcategoriasDaCategoria(dados, 'Bar', 'Frutas')).toEqual([])
   })
 })

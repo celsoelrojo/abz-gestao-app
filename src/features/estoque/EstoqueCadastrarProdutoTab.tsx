@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
 import { confirmar } from '../../store/confirmStore'
 import { visibleCategorias } from './estoqueAccess'
-import { agruparPorCampo, estoqueQuantidadeLabel, ordenarPorTitulo } from './estoqueHelpers'
+import { agruparPorCampo, estoqueQuantidadeLabel, ordenarPorTitulo, subcategoriasDaCategoria } from './estoqueHelpers'
 import {
   ESTOQUE_CONDICOES_ARMAZENAMENTO,
   ESTOQUE_TIPOS_PRODUTO,
@@ -14,6 +14,7 @@ import {
   UNIDADES_VALIDADE,
 } from './estoqueConstants'
 import { EditarProdutoModal } from './EditarProdutoModal'
+import { GerenciarTaxonomiasModal } from './GerenciarTaxonomiasModal'
 import { TaxonomiaField } from './TaxonomiaField'
 import { VolumeProprioFields } from './VolumeProprioFields'
 import {
@@ -51,6 +52,7 @@ export function EstoqueCadastrarProdutoTab() {
   // funcionário do setor (managerOnly:false no SUBMENU), então essa restrição
   // é só da aba de listagem/edição, não do cadastro de produto novo em si.
   const [view, setView] = useState<'novo' | 'lista'>('novo')
+  const [gerenciarTaxonomias, setGerenciarTaxonomias] = useState(false)
 
   const [setor, setSetor] = useState<EstoqueCategoria>((locked as EstoqueCategoria | null) ?? setores[0] ?? 'Bar')
   const [tipoProduto, setTipoProduto] = useState<EstoqueTipoProduto>('Matéria Prima')
@@ -82,9 +84,19 @@ export function EstoqueCadastrarProdutoTab() {
     () => Array.from(new Set([...taxonomiaValores(taxonomias ?? [], setor, 'categoria'), ...pendingCategoria])),
     [taxonomias, setor, pendingCategoria],
   )
+  // Subcategorias vinculadas à categoria escolhida (pedido do usuário) — mais
+  // as recém-adicionadas nesta sessão e a que já está selecionada, pra nunca
+  // sumir um valor válido da lista.
   const subcategoriaOptions = useMemo(
-    () => Array.from(new Set([...taxonomiaValores(taxonomias ?? [], setor, 'subcategoria'), ...pendingSubcategoria])),
-    [taxonomias, setor, pendingSubcategoria],
+    () =>
+      Array.from(
+        new Set([
+          ...subcategoriasDaCategoria(taxonomias ?? [], setor, categoria),
+          ...pendingSubcategoria,
+          ...(subcategoria ? [subcategoria] : []),
+        ]),
+      ),
+    [taxonomias, setor, categoria, pendingSubcategoria, subcategoria],
   )
 
   function resetSetorDependente(next: EstoqueCategoria) {
@@ -96,9 +108,16 @@ export function EstoqueCadastrarProdutoTab() {
     setPendingSubcategoria([])
   }
 
+  // Trocar a categoria zera a subcategoria: a lista dela depende da categoria.
+  function handleCategoriaChange(next: string) {
+    setCategoria(next)
+    setSubcategoria('')
+    setPendingSubcategoria([])
+  }
+
   async function handleAddCategoria(valor: string) {
     setPendingCategoria((p) => [...p, valor])
-    setCategoria(valor)
+    handleCategoriaChange(valor)
     try {
       await registrarTaxonomia('estoque', setor, valor, '')
       await queryClient.invalidateQueries({ queryKey: TAXONOMIAS_KEY('estoque') })
@@ -112,7 +131,7 @@ export function EstoqueCadastrarProdutoTab() {
     setPendingSubcategoria((p) => [...p, valor])
     setSubcategoria(valor)
     try {
-      await registrarTaxonomia('estoque', setor, '', valor)
+      await registrarTaxonomia('estoque', setor, '', valor, categoria || null)
       await queryClient.invalidateQueries({ queryKey: TAXONOMIAS_KEY('estoque') })
     } catch {
       // idem
@@ -198,12 +217,23 @@ export function EstoqueCadastrarProdutoTab() {
             : 'Ver e editar produtos já cadastrados.'}
         </p>
       </div>
-      {canManage && (
-        <button type="button" className="btn btn-ghost" onClick={() => setView(view === 'novo' ? 'lista' : 'novo')}>
-          {view === 'novo' ? 'Ver / editar produtos' : '+ Novo produto'}
-        </button>
-      )}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {isFullAdmin(profile) && (
+          <button type="button" className="btn btn-ghost" onClick={() => setGerenciarTaxonomias(true)}>
+            Gerenciar categorias
+          </button>
+        )}
+        {canManage && (
+          <button type="button" className="btn btn-ghost" onClick={() => setView(view === 'novo' ? 'lista' : 'novo')}>
+            {view === 'novo' ? 'Ver / editar produtos' : '+ Novo produto'}
+          </button>
+        )}
+      </div>
     </div>
+  )
+
+  const taxonomiasModal = gerenciarTaxonomias && (
+    <GerenciarTaxonomiasModal onClose={() => setGerenciarTaxonomias(false)} />
   )
 
   if (view === 'lista') {
@@ -211,6 +241,7 @@ export function EstoqueCadastrarProdutoTab() {
       <div>
         {header}
         <ProdutosCadastradosLista itens={itens ?? []} setores={setores} podeExcluir={isFullAdmin(profile)} />
+        {taxonomiasModal}
       </div>
     )
   }
@@ -218,6 +249,7 @@ export function EstoqueCadastrarProdutoTab() {
   return (
     <div>
       {header}
+      {taxonomiasModal}
       <form className="modal-body" onSubmit={handleSubmit} style={{ maxWidth: 560 }}>
         <div className="field">
           <label>Setor do produto *</label>
@@ -266,7 +298,7 @@ export function EstoqueCadastrarProdutoTab() {
           <TaxonomiaField
             label="Categoria"
             valor={categoria}
-            onChange={setCategoria}
+            onChange={handleCategoriaChange}
             opcoes={categoriaOptions}
             onAdd={handleAddCategoria}
             addTitle="Adicionar categoria"
@@ -280,6 +312,11 @@ export function EstoqueCadastrarProdutoTab() {
             onAdd={handleAddSubcategoria}
             addTitle="Adicionar subcategoria"
             placeholder="Nova subcategoria"
+            hint={
+              categoria
+                ? undefined
+                : 'Escolha a categoria para ver as subcategorias ligadas a ela.'
+            }
           />
         </div>
 

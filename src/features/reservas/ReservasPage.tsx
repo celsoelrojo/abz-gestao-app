@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isManager, useAuthStore } from '../../store/authStore'
+import { Icon } from '../../components/Icon'
 import { formatWeekdayLong, isoDate, weekdayNameForDate } from '../../lib/date'
 import { RESERVA_PERIODOS, RESERVA_STATUS, RESERVA_STATUS_BADGE_CLASS, RESERVA_STATUS_LABELS } from './reservaConstants'
 import { groupReservasByData } from './reservaHelpers'
@@ -70,33 +71,42 @@ export function ReservasPage() {
           <h2 className="page-title">Reservas</h2>
           <p className="page-subtitle">Agenda do salão</p>
         </div>
-        {canManage && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            <button className="btn btn-ghost" onClick={() => setShowCapacidade(true)}>
-              Capacidade
-            </button>
-            <button className="btn btn-primary" onClick={() => setCreating(true)}>
-              + Nova Reserva
-            </button>
-          </div>
-        )}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+      {/* Pedido do usuário: ícones quadrados e pequenos acima, a Agenda
+          continua tendo prioridade — é o primeiro ícone e o que já aparece
+          selecionado por padrão. Agenda/Concluídas alternam a lista abaixo;
+          Nova Reserva/Capacidade seguem restritos a quem gerencia, abrindo
+          modal, igual antes. */}
+      <div className="quick-actions">
         <button
           type="button"
-          className={`btn ${aba === 'agenda' ? 'btn-primary' : 'btn-ghost'}`}
+          className={`quick-btn ${aba === 'agenda' ? 'quick-btn-active' : ''}`}
           onClick={() => setAba('agenda')}
         >
-          Agenda ({agenda.length})
+          <Icon name="reservas-agenda" className="quick-icon" />
+          <span className="quick-label">Agenda ({agenda.length})</span>
         </button>
+        {canManage && (
+          <button type="button" className="quick-btn" onClick={() => setCreating(true)}>
+            <Icon name="reservas-nova" className="quick-icon" />
+            <span className="quick-label">Nova Reserva</span>
+          </button>
+        )}
         <button
           type="button"
-          className={`btn ${aba === 'concluidas' ? 'btn-primary' : 'btn-ghost'}`}
+          className={`quick-btn ${aba === 'concluidas' ? 'quick-btn-active' : ''}`}
           onClick={() => setAba('concluidas')}
         >
-          Concluídas ({concluidas.length})
+          <Icon name="reservas-concluidas" className="quick-icon" />
+          <span className="quick-label">Concluídas ({concluidas.length})</span>
         </button>
+        {canManage && (
+          <button type="button" className="quick-btn" onClick={() => setShowCapacidade(true)}>
+            <Icon name="reservas-capacidade" className="quick-icon" />
+            <span className="quick-label">Capacidade</span>
+          </button>
+        )}
       </div>
 
       <div className="reserva-filters">
@@ -124,6 +134,8 @@ export function ReservasPage() {
           </button>
         )}
       </div>
+
+      <h3 className="section-label">{aba === 'concluidas' ? 'Concluídas' : 'Agenda'}</h3>
 
       {grupos.length === 0 && (
         <div className="empty-state">

@@ -1036,6 +1036,27 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* ============ Reservas (Salão) — Lista agrupada por dia e turno ============ */
+/* Ícones quadrados e pequenos acima do conteúdo de um módulo (pedido do
+   usuário, primeiro em Reservas — Agenda/Nova reserva/Concluídas/Capacidade —
+   depois reaproveitado em Freelancer) — menores que .module-btn (hub de
+   módulo). O botão marcado .quick-btn-active indica a visão atual quando o
+   ícone alterna o conteúdo abaixo dele. */
+.quick-actions { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.quick-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  width: 80px; height: 80px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.quick-btn:hover { transform: translateY(-2px); border-color: var(--gold-dark); background: var(--bg-card-hover); box-shadow: var(--shadow-soft); }
+.quick-btn.quick-btn-active { border-color: var(--gold-bright); background: var(--gold-soft); }
+.quick-icon { font-size: 1.5rem; color: var(--gold-bright); }
+.quick-label { font-size: 0.68rem; font-weight: 600; text-align: center; line-height: 1.15; }
+
 .reserva-day-card {
   background: var(--bg-card);
   border: 1px solid var(--border);

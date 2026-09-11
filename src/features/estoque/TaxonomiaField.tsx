@@ -14,6 +14,7 @@ export function TaxonomiaField({
   onAdd,
   addTitle,
   placeholder,
+  hint,
 }: {
   label: string
   valor: string
@@ -22,6 +23,7 @@ export function TaxonomiaField({
   onAdd: (v: string) => void
   addTitle: string
   placeholder: string
+  hint?: string
 }) {
   const [adding, setAdding] = useState(false)
   const [novo, setNovo] = useState('')
@@ -86,6 +88,7 @@ export function TaxonomiaField({
           </button>
         </div>
       )}
+      {hint && <span className="field-hint">{hint}</span>}
     </div>
   )
 }

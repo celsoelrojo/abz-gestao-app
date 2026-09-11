@@ -9,6 +9,7 @@ import {
   ESTOQUE_UNIDADE_SIGLA,
   UNIDADES_VALIDADE,
 } from './estoqueConstants'
+import { subcategoriasDaCategoria } from './estoqueHelpers'
 import { TaxonomiaField } from './TaxonomiaField'
 import { VolumeProprioFields } from './VolumeProprioFields'
 import {
@@ -64,14 +65,30 @@ export function EditarProdutoModal({ item, onClose, onSaved }: { item: EstoqueIt
     () => Array.from(new Set([...taxonomiaValores(taxonomias ?? [], setor, 'categoria'), ...pendingCategoria])),
     [taxonomias, setor, pendingCategoria],
   )
+  // Só as subcategorias ligadas à categoria escolhida — mais as recém-criadas
+  // e a atual do produto, pra não sumir um valor já gravado mesmo que o
+  // vínculo dele esteja diferente.
   const subcategoriaOptions = useMemo(
-    () => Array.from(new Set([...taxonomiaValores(taxonomias ?? [], setor, 'subcategoria'), ...pendingSubcategoria])),
-    [taxonomias, setor, pendingSubcategoria],
+    () =>
+      Array.from(
+        new Set([
+          ...subcategoriasDaCategoria(taxonomias ?? [], setor, categoria),
+          ...pendingSubcategoria,
+          ...(subcategoria ? [subcategoria] : []),
+        ]),
+      ),
+    [taxonomias, setor, categoria, pendingSubcategoria, subcategoria],
   )
+
+  function handleCategoriaChange(next: string) {
+    setCategoria(next)
+    setSubcategoria('')
+    setPendingSubcategoria([])
+  }
 
   async function handleAddCategoria(valor: string) {
     setPendingCategoria((p) => [...p, valor])
-    setCategoria(valor)
+    handleCategoriaChange(valor)
     try {
       await registrarTaxonomia('estoque', setor, valor, '')
       await queryClient.invalidateQueries({ queryKey: TAXONOMIAS_KEY('estoque') })
@@ -84,7 +101,7 @@ export function EditarProdutoModal({ item, onClose, onSaved }: { item: EstoqueIt
     setPendingSubcategoria((p) => [...p, valor])
     setSubcategoria(valor)
     try {
-      await registrarTaxonomia('estoque', setor, '', valor)
+      await registrarTaxonomia('estoque', setor, '', valor, categoria || null)
       await queryClient.invalidateQueries({ queryKey: TAXONOMIAS_KEY('estoque') })
     } catch {
       // idem
@@ -179,7 +196,7 @@ export function EditarProdutoModal({ item, onClose, onSaved }: { item: EstoqueIt
             <TaxonomiaField
               label="Categoria"
               valor={categoria}
-              onChange={setCategoria}
+              onChange={handleCategoriaChange}
               opcoes={categoriaOptions}
               onAdd={handleAddCategoria}
               addTitle="Adicionar categoria"
@@ -193,6 +210,7 @@ export function EditarProdutoModal({ item, onClose, onSaved }: { item: EstoqueIt
               onAdd={handleAddSubcategoria}
               addTitle="Adicionar subcategoria"
               placeholder="Nova subcategoria"
+              hint={categoria ? undefined : 'Escolha a categoria para ver as subcategorias ligadas a ela.'}
             />
           </div>
 

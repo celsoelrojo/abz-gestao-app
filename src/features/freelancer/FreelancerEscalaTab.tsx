@@ -20,7 +20,6 @@ export function FreelancerEscalaTab() {
   const { data: escalas, isLoading } = useFreelancerEscalas()
   const { data: freelancers } = useFreelancers()
   const [setorFiltro, setSetorFiltro] = useState<'Todos' | Setor>('Todos')
-  const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<FreelancerEscalaRow | null>(null)
 
   const nomeDoFreelancer = useMemo(() => {
@@ -104,9 +103,6 @@ export function FreelancerEscalaTab() {
           ))}
         </select>
       </div>
-      <button className="btn btn-primary" onClick={() => setCreating(true)}>
-        + Nova Escala
-      </button>
 
       {isLoading && <div className="empty-state">Carregando…</div>}
 
@@ -140,15 +136,13 @@ export function FreelancerEscalaTab() {
         </div>
       ))}
 
-      {(creating || editing) && (
+      {editing && (
         <EscalaFormModal
           escala={editing}
           onClose={() => {
-            setCreating(false)
             setEditing(null)
           }}
           onSaved={async () => {
-            setCreating(false)
             setEditing(null)
             await refetch()
           }}

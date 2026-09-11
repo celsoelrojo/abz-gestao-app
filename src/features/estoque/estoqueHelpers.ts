@@ -1,4 +1,4 @@
-import type { EstoqueCategoria, EstoqueItemRow, EstoqueUnidade } from '../../types/database'
+import type { EstoqueCategoria, EstoqueItemRow, EstoqueUnidade, TaxonomiaRow } from '../../types/database'
 import {
   ESTOQUE_CATEGORIAS,
   ESTOQUE_UNIDADES_EMBALAGEM,
@@ -147,6 +147,29 @@ export function agruparPorCampo<T>(items: T[], getCampo: (item: T) => string | n
 
 export function ordenarPorTitulo<T extends { title: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
+}
+
+// Subcategorias (taxonomias) que pertencem à categoria escolhida — pedido do
+// usuário: escolher "Bebidas alcoólicas" mostra só Destilada/Amari/Licores.
+// O vínculo é por categoria_pai (valor da categoria mãe). Sem categoria
+// escolhida (categoriaPai vazio) devolve as ainda não vinculadas
+// (categoria_pai null) pra continuarem visíveis e organizáveis. Ordem pt-BR,
+// sem repetidos.
+export function subcategoriasDaCategoria(
+  taxonomias: Pick<TaxonomiaRow, 'setor' | 'tipo' | 'valor' | 'categoria_pai'>[],
+  setor: string,
+  categoriaPai: string,
+): string[] {
+  const alvo = categoriaPai.trim()
+  const valores = taxonomias
+    .filter(
+      (t) =>
+        t.setor === setor &&
+        t.tipo === 'subcategoria' &&
+        (alvo ? t.categoria_pai === alvo : t.categoria_pai == null),
+    )
+    .map((t) => t.valor)
+  return [...new Set(valores)].sort((a, b) => a.localeCompare(b, 'pt-BR'))
 }
 
 // Categorias de produto (produto_categoria) distintas presentes numa lista,

@@ -534,6 +534,9 @@ export type TaxonomiaRow = {
   setor: string
   tipo: 'categoria' | 'subcategoria'
   valor: string
+  // Só pra tipo='subcategoria' (modulo estoque): valor da categoria mãe. null
+  // = subcategoria ainda não vinculada a nenhuma categoria.
+  categoria_pai: string | null
 }
 
 export type MensagemDestino = 'Bar' | 'Cozinha' | 'Salão' | 'Todos'
@@ -707,6 +710,7 @@ export type Database = {
         Returns: EstoqueMovimentoRow
       }
       finalizar_recebimento: { Args: { p_pedido_id: string }; Returns: undefined }
+      renomear_taxonomia: { Args: { p_id: string; p_novo: string }; Returns: undefined }
       reservas_hoje_resumo: {
         Args: Record<string, never>
         Returns: { periodo: ReservaPeriodo; total_pessoas: number }[]

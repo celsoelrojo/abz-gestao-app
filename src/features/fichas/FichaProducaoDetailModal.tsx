@@ -4,16 +4,18 @@ import { useEstoqueItens } from '../estoque/useEstoque'
 import { calcProducaoFichaCustoTotal, calcProducaoIngredienteCustoTotal } from './fichaHelpers'
 import { FICHAS_PRODUCAO_LOTES_KEY, useFichaProducaoLotes } from './useFichasProducao'
 import { FichaProducaoLoteFormModal } from './FichaProducaoLoteFormModal'
-import { ProducaoCalculadora } from './ProducaoCalculadora'
 import { fichaImagemUrl } from './fichaStorage'
 import type { EstoqueItemRow, FichaProducaoLoteRow, FichaProducaoRow } from '../../types/database'
 
+// Pedido do usuário: a Calculadora de Produção saiu daqui e virou submódulo
+// próprio (FichaProducaoCalculadoraTab, com caixa de busca de receita) — este
+// modal ficou só com Ficha e Lotes.
 export function FichaProducaoDetailModal({ ficha, onClose }: { ficha: FichaProducaoRow; onClose: () => void }) {
   const queryClient = useQueryClient()
   const { data: lotes } = useFichaProducaoLotes(ficha.id)
   const { data: estoqueItens } = useEstoqueItens()
   const [registrandoLote, setRegistrandoLote] = useState(false)
-  const [aba, setAba] = useState<'ficha' | 'lotes' | 'calculadora'>('ficha')
+  const [aba, setAba] = useState<'ficha' | 'lotes'>('ficha')
 
   async function refetchLotes() {
     await queryClient.invalidateQueries({ queryKey: FICHAS_PRODUCAO_LOTES_KEY(ficha.id) })
@@ -36,9 +38,6 @@ export function FichaProducaoDetailModal({ ficha, onClose }: { ficha: FichaProdu
             <button className={`btn ${aba === 'lotes' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setAba('lotes')}>
               Lotes
             </button>
-            <button className={`btn ${aba === 'calculadora' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setAba('calculadora')}>
-              Calculadora de Produção
-            </button>
           </div>
 
           {aba === 'ficha' && <FichaInfo ficha={ficha} estoqueItens={estoqueItens ?? []} />}
@@ -50,15 +49,6 @@ export function FichaProducaoDetailModal({ ficha, onClose }: { ficha: FichaProdu
               </button>
               <LotesList lotes={lotes ?? []} />
             </div>
-          )}
-
-          {aba === 'calculadora' && (
-            <ProducaoCalculadora
-              ingredientes={ficha.ingredientes}
-              estoqueItens={estoqueItens ?? []}
-              qtdLotePadrao={ficha.qtd_lote_padrao}
-              unidadeRendimento={ficha.unidade_rendimento}
-            />
           )}
 
           <div className="modal-footer">

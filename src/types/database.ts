@@ -58,6 +58,8 @@ export type ChecklistTaskRow = {
   foto_obrigatoria: boolean
   freelancer_pagamento: boolean
   freelancer_escala_id: string | null
+  // Tarefa "Produzir RAF" gerada pelo Cardápio RAF (migration 0046).
+  cardapio_id: string | null
   active: boolean
   posicao: number
   created_at: string
@@ -528,6 +530,25 @@ export type EstoqueMovimentoRow = {
   created_at: string
 }
 
+// Cardápio RAF semanal (migrations 0044/0045): uma linha por semana
+// (semana_inicio = segunda-feira); só os dias com prato ficam em `dias`.
+// `nome` é a cópia do nome da Ficha Técnica na hora de salvar.
+export type CardapioDia = {
+  data: string
+  fichaTecnicaId: string
+  nome: string
+}
+
+export type CardapioRow = {
+  id: string
+  semana_inicio: string
+  observacoes: string | null
+  dias: CardapioDia[]
+  criado_por: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type TaxonomiaRow = {
   id: string
   modulo: 'ficha_tecnica' | 'ficha_producao' | 'estoque' | 'pop'
@@ -671,6 +692,7 @@ export type Database = {
       reservas: TableDef<ReservaRow>
       reserva_capacidade: TableDef<ReservaCapacidadeRow>
       freelancer_escalas: TableDef<FreelancerEscalaRow>
+      cardapios: TableDef<CardapioRow>
       sobre_nos_secoes: TableDef<SobreNosSecaoRow>
     }
     Views: {

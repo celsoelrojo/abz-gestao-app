@@ -12,6 +12,7 @@ import { EstoquePage } from './features/estoque/EstoquePage'
 import { ReservasPage } from './features/reservas/ReservasPage'
 import { FichasTecnicasPage } from './features/fichas/FichasTecnicasPage'
 import { FichasProducaoPage } from './features/fichas/FichasProducaoPage'
+import { CardapioPage } from './features/cardapio/CardapioPage'
 import { MapasPage } from './features/mapas/MapasPage'
 import { FreelancerPage } from './features/freelancer/FreelancerPage'
 import { PopsPage } from './features/pops/PopsPage'
@@ -116,6 +117,16 @@ export default function App() {
               ) : (
                 <Navigate to="/" replace />
               )}
+            </Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cardapio-raf"
+        element={
+          <ProtectedRoute>
+            <Shell>
+              {(isAdmin || profile?.setor === 'Cozinha') && !freelancer ? <CardapioPage /> : <Navigate to="/" replace />}
             </Shell>
           </ProtectedRoute>
         }

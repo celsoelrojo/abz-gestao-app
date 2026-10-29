@@ -35,6 +35,8 @@ const MIGRATED_MODULES: { key: string; to: string; title: string; desc: string; 
     icon: 'fichas-producao',
     roles: 'bar_cozinha',
   },
+  // Exclusivo da Cozinha + Administração (rota em App.tsx e RLS cardapios_*).
+  { key: 'cardapio-raf', to: '/cardapio-raf', title: 'Cardápio RAF', desc: 'Cardápio semanal da cozinha', icon: 'cardapio', roles: 'cozinha' },
   { key: 'pops', to: '/pops', title: "POP's", desc: 'Procedimentos Operacionais Padrão', icon: 'pops', roles: 'todos' },
   { key: 'mapas', to: '/mapas', title: 'Mapas e Fluxogramas', desc: 'Layout do ambiente e fluxos de processo', icon: 'mapas', roles: 'todos' },
   // Igual ao protótipo (MODULE_ACCESS.freelancer = ['administrador']) — o
@@ -54,6 +56,7 @@ export function HomePage() {
   const managerAccess = isManager(profile)
   const salaoAccess = isAdmin || profile?.setor === 'Salão'
   const barCozinhaAccess = isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha'
+  const cozinhaAccess = isAdmin || profile?.setor === 'Cozinha'
 
   useChecklistRealtime()
   const { data: resumoDia } = useChecklistResumoDia()
@@ -86,7 +89,8 @@ export function HomePage() {
             (m.roles === 'admin' && isAdmin) ||
             (m.roles === 'manager' && managerAccess) ||
             (m.roles === 'salao' && salaoAccess) ||
-            (m.roles === 'bar_cozinha' && barCozinhaAccess),
+            (m.roles === 'bar_cozinha' && barCozinhaAccess) ||
+            (m.roles === 'cozinha' && cozinhaAccess),
         ).map((m) => (
           <Link className="module-btn" to={m.to} key={m.key}>
             <Icon name={m.icon} className="module-icon" />

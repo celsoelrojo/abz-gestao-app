@@ -31,6 +31,10 @@ const OVERRIDES: Partial<Record<string, { strokeWidth?: number; scale?: number }
   // Submenu de Fichas de Produção (mesmo motivo do bloco "estoque-*" acima):
   // cópias dedicadas pra poder dobrar o tamanho só ali, sem afetar o card
   // "Fichas de Produção" da Home, que usa a chave "fichas-producao" original.
+  // Cardápio RAF: "cardapio" é o tile da Home; os dois de baixo, o submenu.
+  cardapio: { scale: 1.7 },
+  'cardapio-adicionar': { scale: 2 },
+  'cardapio-visualizar': { scale: 2 },
   'fichas-producao-hub': { scale: 2 },
   'fichas-producao-calculadora': { scale: 2 },
   'fichas-producao-gerenciar': { scale: 2 },
@@ -198,6 +202,34 @@ const PATHS: Record<string, ReactNode> = {
     <>
       <path d="M6 3.5h9l3 3v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" />
       <path d="M9 11h6M9 15h6M9 7h3" />
+    </>
+  ),
+  // Cardápio RAF: cloche (a tampa de prato servido) — diferencia da panela
+  // de Fichas de Produção. Os do submenu usam a folha de cardápio com "+"
+  // (adicionar) e lupa (visualizar), mesma lógica de marca-no-canto de
+  // "estoque-cadastrar".
+  cardapio: (
+    <>
+      <path d="M3 18h18" />
+      <path d="M5 18a7 7 0 0 1 14 0" />
+      <path d="M12 11V8.8" />
+      <circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  'cardapio-adicionar': (
+    <>
+      <path d="M5 3.5h8a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" />
+      <path d="M7 8h5M7 11.5h5M7 15h3" />
+      <path d="M19 3v6" />
+      <path d="M16 6h6" />
+    </>
+  ),
+  'cardapio-visualizar': (
+    <>
+      <path d="M5 3.5h8a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" />
+      <path d="M7 8h5M7 11.5h3" />
+      <circle cx="16.5" cy="15" r="3" />
+      <path d="M18.7 17.2 21.5 20" />
     </>
   ),
   // Cópia idêntica de "fichas-producao" (a panela) — usada só pelo tile

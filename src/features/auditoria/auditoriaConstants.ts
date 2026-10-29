@@ -1,5 +1,5 @@
 // Nome amigável das tabelas auditadas (ver migration 0011_auditoria.sql —
-// só essas 10 tabelas têm trigger de auditoria; o restante não é rastreado).
+// só essas 11 tabelas têm trigger de auditoria; o restante não é rastreado).
 export const AUDIT_TABLE_LABELS: Record<string, string> = {
   checklist_tasks: 'Checklist — Tarefas',
   checklist_conclusoes: 'Checklist — Conclusões',
@@ -11,6 +11,7 @@ export const AUDIT_TABLE_LABELS: Record<string, string> = {
   pops: "POP's",
   fichas_tecnicas: 'Fichas Técnicas',
   fichas_producao: 'Fichas de Produção',
+  cardapios: 'Cardápio RAF',
 }
 
 export const AUDIT_TABLES = Object.keys(AUDIT_TABLE_LABELS)

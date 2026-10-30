@@ -68,6 +68,8 @@ describe('groupReservasByData', () => {
 describe('reservaFormError', () => {
   const base = {
     nomeCliente: 'Ana',
+    whatsapp: '(79) 98149-5581',
+    exigeWhatsapp: true,
     data: '2026-08-25',
     horario: '12:00',
     periodo: 'Almoço',
@@ -83,6 +85,16 @@ describe('reservaFormError', () => {
   it('erro quando falta nome/data/horário/período/quantidade', () => {
     expect(reservaFormError({ ...base, nomeCliente: '' })).not.toBeNull()
     expect(reservaFormError({ ...base, quantidadePessoas: 0 })).not.toBeNull()
+  })
+
+  it('exige WhatsApp válido (com DDD) quando obrigatório', () => {
+    expect(reservaFormError({ ...base, whatsapp: '' })).toMatch(/WhatsApp/)
+    expect(reservaFormError({ ...base, whatsapp: '98149-5581' })).toMatch(/WhatsApp/)
+    expect(reservaFormError({ ...base, whatsapp: '+55 79 98149-5581' })).toBeNull()
+  })
+
+  it('reserva antiga sem contato pode ser editada sem WhatsApp', () => {
+    expect(reservaFormError({ ...base, whatsapp: '', exigeWhatsapp: false })).toBeNull()
   })
 
   it('exige motivo do cancelamento quando status é cancelada', () => {

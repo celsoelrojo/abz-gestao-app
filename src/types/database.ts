@@ -60,6 +60,8 @@ export type ChecklistTaskRow = {
   freelancer_escala_id: string | null
   // Tarefa "Produzir RAF" gerada pelo Cardápio RAF (migration 0046).
   cardapio_id: string | null
+  // Tarefa "Acompanhar reserva" gerada por reservas.acompanhamento_obs (0047).
+  reserva_id: string | null
   active: boolean
   posicao: number
   created_at: string
@@ -611,11 +613,29 @@ export type ReservaRow = {
   cancelada_por: string | null
   cancelada_em: string | null
   historico: ReservaHistoricoEntry[]
+  // 0047: telefone passa a ser o WhatsApp (identificador do cliente).
+  cliente_id: string | null
+  primeira_vez: boolean | null
+  // Observação pós-reserva — gera a tarefa de acompanhamento no Checklist.
+  acompanhamento_obs: string | null
   created_at: string
   updated_at: string
 }
 
-export type ReservaSemContatoRow = Omit<ReservaRow, 'telefone' | 'email' | 'instagram'>
+// A view do Atendente não traz contato, nem o cliente, nem o acompanhamento
+// (internos da gestão).
+export type ReservaSemContatoRow = Omit<
+  ReservaRow,
+  'telefone' | 'email' | 'instagram' | 'cliente_id' | 'acompanhamento_obs'
+>
+
+export type ClienteRow = {
+  id: string
+  whatsapp: string
+  nome: string
+  created_at: string
+  updated_at: string
+}
 
 export type ReservaCapacidadeRow = {
   periodo: ReservaPeriodo
@@ -693,6 +713,7 @@ export type Database = {
       reserva_capacidade: TableDef<ReservaCapacidadeRow>
       freelancer_escalas: TableDef<FreelancerEscalaRow>
       cardapios: TableDef<CardapioRow>
+      clientes: TableDef<ClienteRow>
       sobre_nos_secoes: TableDef<SobreNosSecaoRow>
     }
     Views: {

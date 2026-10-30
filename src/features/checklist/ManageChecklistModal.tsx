@@ -43,9 +43,10 @@ export function ManageChecklistModal({ onClose }: { onClose: () => void }) {
     const map = new Map<Setor, ChecklistTaskRow[]>()
     visibleSetores.forEach((s) => map.set(s, []))
     ;(tasksQuery.data ?? [])
-      // Tarefas geradas pelo pagamento de freelancer e pelo Cardápio RAF são
-      // mantidas por trigger — não se editam por aqui.
-      .filter((t) => !t.freelancer_pagamento && !t.cardapio_id && visibleSetores.includes(t.setor))
+      // Tarefas geradas pelo pagamento de freelancer, pelo Cardápio RAF e pelo
+      // acompanhamento de reservas são mantidas por trigger — não se editam
+      // por aqui.
+      .filter((t) => !t.freelancer_pagamento && !t.cardapio_id && !t.reserva_id && visibleSetores.includes(t.setor))
       .forEach((t) => map.get(t.setor)!.push(t))
     return map
   }, [tasksQuery.data, visibleSetores])

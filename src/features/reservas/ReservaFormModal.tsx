@@ -2,8 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { formatDateBR } from '../../lib/date'
 import { supabase } from '../../lib/supabaseClient'
-import { RESERVA_OCASIOES, RESERVA_ORIGENS, RESERVA_PERIODOS, RESERVA_STATUS, RESERVA_STATUS_LABELS } from './reservaConstants'
+import { RESERVA_ORIGENS, RESERVA_PERIODOS, RESERVA_STATUS, RESERVA_STATUS_LABELS } from './reservaConstants'
 import { buildHistoricoEntries, reservaFormError, reservaSlotStats } from './reservaHelpers'
+import { buscarClientePorWhatsapp, type ClienteEncontrado } from './useReservas'
+import { formatarWhatsapp, normalizarWhatsapp } from './whatsapp'
 import type { ReservaPeriodo, ReservaRow, ReservaCapacidadeRow, ReservaStatus } from '../../types/database'
 
 export function ReservaFormModal({
@@ -26,16 +28,24 @@ export function ReservaFormModal({
   const [data, setData] = useState(reserva?.data ?? '')
   const [horario, setHorario] = useState(reserva?.horario?.slice(0, 5) ?? '')
   const [periodo, setPeriodo] = useState<ReservaPeriodo>(reserva?.periodo ?? 'Almoço')
-  const [telefone, setTelefone] = useState(reserva?.telefone ?? '')
-  const [instagram, setInstagram] = useState(reserva?.instagram ?? '')
-  const [email, setEmail] = useState(reserva?.email ?? '')
+  // O campo de telefone da reserva passou a ser o WhatsApp do cliente — o
+  // identificador dele nas reservas e no banco de clientes.
+  const [whatsapp, setWhatsapp] = useState(
+    reserva?.telefone ? formatarWhatsapp(normalizarWhatsapp(reserva.telefone) ?? reserva.telefone) : '',
+  )
   const [origem, setOrigem] = useState(reserva?.origem ?? '')
+  const [primeiraVez, setPrimeiraVez] = useState<'sim' | 'nao' | ''>(
+    reserva?.primeira_vez == null ? '' : reserva.primeira_vez ? 'sim' : 'nao',
+  )
+  // Quando a pessoa escolhe "primeira vez" na mão, a busca pelo WhatsApp não
+  // sobrescreve mais a escolha.
+  const [primeiraVezManual, setPrimeiraVezManual] = useState(reserva?.primeira_vez != null)
+  const [clienteInfo, setClienteInfo] = useState<
+    { tipo: 'novo' } | ({ tipo: 'existente' } & ClienteEncontrado) | null
+  >(null)
   const [mesa, setMesa] = useState(reserva?.mesa ?? '')
-  const [ocasiao, setOcasiao] = useState(reserva?.ocasiao ?? '')
   const [observacoes, setObservacoes] = useState(reserva?.observacoes ?? '')
-  const [restricoes, setRestricoes] = useState(reserva?.restricoes ?? '')
-  const [responsavel, setResponsavel] = useState(reserva?.responsavel ?? profile?.nome ?? '')
-  const [sinal, setSinal] = useState(reserva?.sinal ?? '')
+  const [acompanhamentoObs, setAcompanhamentoObs] = useState(reserva?.acompanhamento_obs ?? '')
   const [status, setStatus] = useState<ReservaStatus>(reserva?.status ?? 'pendente')
   const [motivoCancelamento, setMotivoCancelamento] = useState(reserva?.motivo_cancelamento ?? '')
   const [error, setError] = useState<string | null>(null)
@@ -44,26 +54,51 @@ export function ReservaFormModal({
 
   const quantidadeNum = Number(quantidadePessoas)
 
+  // Ao sair do campo WhatsApp: procura o cliente no banco. Se já veio antes,
+  // reconhece (e completa o nome, se estava vazio) e marca "não é a primeira
+  // vez"; se não existe, é cliente novo. Não sobrescreve uma escolha manual.
+  async function reconhecerCliente() {
+    const numero = normalizarWhatsapp(whatsapp)
+    if (!numero) {
+      setClienteInfo(null)
+      return
+    }
+    setWhatsapp(formatarWhatsapp(numero))
+    try {
+      const achado = await buscarClientePorWhatsapp(numero, reserva?.id)
+      if (!achado) {
+        setClienteInfo({ tipo: 'novo' })
+        if (!primeiraVezManual) setPrimeiraVez('sim')
+        return
+      }
+      setClienteInfo({ tipo: 'existente', ...achado })
+      if (!nomeCliente.trim()) setNomeCliente(achado.nome)
+      if (!primeiraVezManual) setPrimeiraVez(achado.reservasAnteriores > 0 ? 'nao' : 'sim')
+    } catch {
+      // Sem a busca o formulário continua funcionando — só não pré-preenche.
+      setClienteInfo(null)
+    }
+  }
+
   async function doSave(): Promise<boolean> {
     setError(null)
     const now = new Date().toISOString()
     const payload = {
       nome_cliente: nomeCliente.trim(),
-      telefone: telefone.trim() || null,
-      instagram: instagram.trim() || null,
-      email: email.trim() || null,
+      // Normalizado (só dígitos, sem o 55) — o banco guarda do mesmo jeito e
+      // usa como chave do cliente. Reserva antiga com contato em texto livre
+      // mantém o que tinha se a pessoa não digitou um número válido.
+      telefone: normalizarWhatsapp(whatsapp) ?? (whatsapp.trim() || null),
       origem: origem || null,
+      primeira_vez: primeiraVez === '' ? null : primeiraVez === 'sim',
       data,
       horario,
       periodo,
       quantidade_pessoas: quantidadeNum,
       mesa: mesa.trim() || null,
-      ocasiao: ocasiao || null,
       observacoes: observacoes.trim() || null,
-      restricoes: restricoes.trim() || null,
-      responsavel: responsavel.trim() || null,
+      acompanhamento_obs: acompanhamentoObs.trim() || null,
       status,
-      sinal: sinal.trim() || null,
       motivo_cancelamento: status === 'cancelada' ? motivoCancelamento.trim() : null,
     }
 
@@ -90,6 +125,9 @@ export function ReservaFormModal({
     } else {
       const { error: insertError } = await supabase.from('reservas').insert({
         ...payload,
+        // Campos que saíram do formulário não são mais pedidos; o "responsável
+        // pelo registro" passa a ser quem criou, sem precisar digitar.
+        responsavel: profile?.nome ?? null,
         criado_por: profile?.nome ?? null,
         historico: [],
       })
@@ -105,6 +143,8 @@ export function ReservaFormModal({
     e.preventDefault()
     const validationError = reservaFormError({
       nomeCliente,
+      whatsapp,
+      exigeWhatsapp: !reserva || !!reserva.telefone,
       data,
       horario,
       periodo,
@@ -158,17 +198,41 @@ export function ReservaFormModal({
           </button>
         </div>
         <form className="modal-body" onSubmit={handleSubmit}>
+          <h4 className="section-label">Identificação do cliente</h4>
           <div className="field-row">
             <div className="field">
               <label>Nome do cliente *</label>
               <input value={nomeCliente} onChange={(e) => setNomeCliente(e.target.value)} required />
             </div>
             <div className="field">
-              <label>Quantidade de pessoas *</label>
-              <input type="number" min="1" value={quantidadePessoas} onChange={(e) => setQuantidadePessoas(e.target.value)} required />
+              <label>WhatsApp *</label>
+              <input
+                type="tel"
+                inputMode="tel"
+                value={whatsapp}
+                onChange={(e) => {
+                  setWhatsapp(e.target.value)
+                  setClienteInfo(null)
+                }}
+                onBlur={reconhecerCliente}
+                placeholder="(79) 98149-5581"
+              />
+              {clienteInfo?.tipo === 'existente' && (
+                <span className="field-hint">
+                  Cliente já cadastrado: {clienteInfo.nome} ·{' '}
+                  {clienteInfo.reservasAnteriores === 0
+                    ? 'sem reservas anteriores'
+                    : `${clienteInfo.reservasAnteriores} ${clienteInfo.reservasAnteriores === 1 ? 'reserva anterior' : 'reservas anteriores'}`}
+                </span>
+              )}
+              {clienteInfo?.tipo === 'novo' && <span className="field-hint">Cliente novo — será cadastrado com esta reserva.</span>}
             </div>
           </div>
           <div className="field-row">
+            <div className="field">
+              <label>Quantidade de pessoas *</label>
+              <input type="number" min="1" value={quantidadePessoas} onChange={(e) => setQuantidadePessoas(e.target.value)} required />
+            </div>
             <div className="field">
               <label>Data da reserva *</label>
               <input type="date" value={data} onChange={(e) => setData(e.target.value)} required />
@@ -177,6 +241,8 @@ export function ReservaFormModal({
               <label>Horário *</label>
               <input type="time" value={horario} onChange={(e) => setHorario(e.target.value)} required />
             </div>
+          </div>
+          <div className="field-row">
             <div className="field">
               <label>Período *</label>
               <div className="sector-filter">
@@ -192,24 +258,6 @@ export function ReservaFormModal({
                 ))}
               </div>
             </div>
-          </div>
-
-          <h4 className="section-label">Contato e origem</h4>
-          <div className="field-row">
-            <div className="field">
-              <label>Telefone/WhatsApp</label>
-              <input value={telefone} onChange={(e) => setTelefone(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Instagram</label>
-              <input value={instagram} onChange={(e) => setInstagram(e.target.value)} />
-            </div>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>E-mail</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
             <div className="field">
               <label>Origem da reserva</label>
               <select value={origem} onChange={(e) => setOrigem(e.target.value)}>
@@ -221,46 +269,37 @@ export function ReservaFormModal({
                 ))}
               </select>
             </div>
+            <div className="field">
+              <label>Primeira vez do cliente na casa?</label>
+              <div className="sector-filter">
+                {(['sim', 'nao'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`sector-filter-btn ${primeiraVez === v ? 'active' : ''}`}
+                    onClick={() => {
+                      setPrimeiraVez(v)
+                      setPrimeiraVezManual(true)
+                    }}
+                  >
+                    {v === 'sim' ? 'Sim' : 'Não'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <h4 className="section-label">Mesa e ocasião</h4>
-          <div className="field-row">
-            <div className="field">
-              <label>Mesa desejada/atribuída</label>
-              <input value={mesa} onChange={(e) => setMesa(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Ocasião especial</label>
-              <select value={ocasiao} onChange={(e) => setOcasiao(e.target.value)}>
-                <option value="">Nenhuma</option>
-                {RESERVA_OCASIOES.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <h4 className="section-label">Mesa e observações</h4>
+          <div className="field">
+            <label>Mesa desejada</label>
+            <input value={mesa} onChange={(e) => setMesa(e.target.value)} />
           </div>
           <div className="field">
             <label>Observações do cliente</label>
             <textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={2} />
           </div>
-          <div className="field">
-            <label>Restrições alimentares, acessibilidade ou necessidades especiais</label>
-            <textarea value={restricoes} onChange={(e) => setRestricoes(e.target.value)} rows={2} />
-          </div>
 
           <h4 className="section-label">Controle interno</h4>
-          <div className="field-row">
-            <div className="field">
-              <label>Responsável pelo registro</label>
-              <input value={responsavel} onChange={(e) => setResponsavel(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Sinal / pagamento antecipado</label>
-              <input value={sinal} onChange={(e) => setSinal(e.target.value)} placeholder="Ex: R$ 50 via Pix" />
-            </div>
-          </div>
           <div className="field">
             <label>Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value as ReservaStatus)}>
@@ -277,6 +316,19 @@ export function ReservaFormModal({
               <textarea value={motivoCancelamento} onChange={(e) => setMotivoCancelamento(e.target.value)} rows={2} required />
             </div>
           )}
+          <div className="field">
+            <label>Observação pós-reserva (a fazer depois da reserva)</label>
+            <textarea
+              value={acompanhamentoObs}
+              onChange={(e) => setAcompanhamentoObs(e.target.value)}
+              rows={2}
+              placeholder="Ex.: ligar agradecendo a visita, enviar convite de retorno..."
+            />
+            <span className="field-hint">
+              Preenchida, vira uma tarefa de acompanhamento no Checklist do Salão, no dia seguinte à reserva — só a Gestão
+              do Salão e o Administrador veem.
+            </span>
+          </div>
 
           {reserva && reserva.historico.length > 0 && (
             <div className="field">

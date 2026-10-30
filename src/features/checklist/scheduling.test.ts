@@ -26,6 +26,7 @@ function makeTask(overrides: Partial<ChecklistTaskRow>): ChecklistTaskRow {
     freelancer_pagamento: false,
     freelancer_escala_id: null,
     cardapio_id: null,
+    reserva_id: null,
     active: true,
     posicao: 0,
     created_at: '',

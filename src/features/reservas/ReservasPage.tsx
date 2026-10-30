@@ -5,6 +5,7 @@ import { Icon } from '../../components/Icon'
 import { formatWeekdayLong, isoDate, weekdayNameForDate } from '../../lib/date'
 import { RESERVA_PERIODOS, RESERVA_STATUS, RESERVA_STATUS_BADGE_CLASS, RESERVA_STATUS_LABELS } from './reservaConstants'
 import { groupReservasByData } from './reservaHelpers'
+import { formatarWhatsapp } from './whatsapp'
 import { RESERVAS_KEY, useReservaCapacidade, useReservas, useReservasRealtime } from './useReservas'
 import { ReservaFormModal } from './ReservaFormModal'
 import { ReservaCapacidadeModal } from './ReservaCapacidadeModal'
@@ -192,11 +193,11 @@ export function ReservasPage() {
 }
 
 function ReservaSlotItem({ reserva, clickable, onClick }: { reserva: ReservaRow; clickable: boolean; onClick: () => void }) {
-  // Telefone/Instagram só aparecem pra quem gerencia — Atendente vê o resto
-  // normalmente, mas sem esse contato do cliente (mesmo texto/regra do
-  // protótipo). Email nunca aparece nesta lista pra ninguém (só no formulário).
+  // WhatsApp (e o Instagram que reservas antigas ainda carregam) só aparecem
+  // pra quem gerencia — Atendente vê o resto normalmente, mas sem o contato do
+  // cliente (mesmo texto/regra do protótipo). Email nunca aparece nesta lista.
   const contatoBits: string[] = []
-  if (clickable && reserva.telefone) contatoBits.push(`Tel: ${reserva.telefone}`)
+  if (clickable && reserva.telefone) contatoBits.push(`WhatsApp: ${formatarWhatsapp(reserva.telefone)}`)
   if (clickable && reserva.instagram) contatoBits.push(`Instagram: ${reserva.instagram}`)
 
   return (
@@ -215,9 +216,13 @@ function ReservaSlotItem({ reserva, clickable, onClick }: { reserva: ReservaRow;
       <div className="reserva-slot-item-meta">
         {reserva.quantidade_pessoas} {reserva.quantidade_pessoas === 1 ? 'pessoa' : 'pessoas'}
         {reserva.mesa ? ` · Mesa ${reserva.mesa}` : ''}
+        {reserva.primeira_vez ? ' · Primeira vez' : ''}
       </div>
       {contatoBits.length > 0 && <div className="reserva-slot-item-meta">{contatoBits.join(' · ')}</div>}
       {reserva.observacoes && <div className="reserva-slot-item-obs">{reserva.observacoes}</div>}
+      {clickable && reserva.acompanhamento_obs && (
+        <div className="reserva-slot-item-meta">Acompanhamento: {reserva.acompanhamento_obs}</div>
+      )}
     </div>
   )
 }

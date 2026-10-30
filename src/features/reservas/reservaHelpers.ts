@@ -1,3 +1,4 @@
+import { normalizarWhatsapp } from './whatsapp'
 import type { ReservaHistoricoEntry, ReservaPeriodo, ReservaStatus } from '../../types/database'
 
 export interface ReservaComoSlot {
@@ -60,9 +61,14 @@ export function groupReservasByData<T extends { data: string; horario: string | 
   return [...porData.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([data, porPeriodo]) => ({ data, porPeriodo }))
 }
 
-// Espelha a validação de saveReserva (script.js:10244-10254).
+// Espelha a validação de saveReserva (script.js:10244-10254) + WhatsApp
+// obrigatório (identificador do cliente).
 export function reservaFormError(d: {
   nomeCliente: string
+  // WhatsApp digitado e se ele é obrigatório (reserva nova, ou antiga que já
+  // tinha contato). Reserva antiga sem contato pode ser editada sem ele.
+  whatsapp: string
+  exigeWhatsapp: boolean
   data: string
   horario: string
   periodo: string
@@ -72,6 +78,9 @@ export function reservaFormError(d: {
 }): string | null {
   if (!d.nomeCliente.trim() || !d.data || !d.horario || !d.periodo || !(d.quantidadePessoas > 0)) {
     return 'Preencha nome, data, horário, período e quantidade de pessoas.'
+  }
+  if (d.exigeWhatsapp && !normalizarWhatsapp(d.whatsapp)) {
+    return 'Informe o WhatsApp do cliente com DDD (ex.: 79 98149-5581).'
   }
   if (d.status === 'cancelada' && !d.motivoCancelamento.trim()) {
     return 'Informe o motivo do cancelamento.'

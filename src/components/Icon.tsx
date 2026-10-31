@@ -33,6 +33,8 @@ const OVERRIDES: Partial<Record<string, { strokeWidth?: number; scale?: number }
   // "Fichas de Produção" da Home, que usa a chave "fichas-producao" original.
   // Cardápio RAF: "cardapio" é o tile da Home; os dois de baixo, o submenu.
   cardapio: { scale: 1.7 },
+  // Requisição: "requisicao" é o tile da Home; os 3 de baixo, os ícones rápidos do módulo.
+  requisicao: { scale: 1.7 },
   'cardapio-adicionar': { scale: 2 },
   'cardapio-visualizar': { scale: 2 },
   'fichas-producao-hub': { scale: 2 },
@@ -214,6 +216,35 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M5 18a7 7 0 0 1 14 0" />
       <path d="M12 11V8.8" />
       <circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Requisição: prancheta com a chave inglesa (compra/conserto); nos ícones
+  // rápidos ganha o "+" (nova), o relógio (abertas) e o check (encerradas).
+  requisicao: (
+    <>
+      <path d="M8 4.5h8a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z" />
+      <path d="M10 3h4v3h-4z" />
+      <path d="M9.8 11h4.4M9.8 14.5h4.4M9.8 18h2.4" />
+    </>
+  ),
+  'requisicao-nova': (
+    <>
+      <path d="M5 3.5h8a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" />
+      <path d="M7 8h5M7 11.5h5M7 15h3" />
+      <path d="M19 3v6" />
+      <path d="M16 6h6" />
+    </>
+  ),
+  'requisicao-abertas': (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  'requisicao-encerradas': (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M8 12.3l2.8 2.8 5.2-5.6" />
     </>
   ),
   'cardapio-adicionar': (

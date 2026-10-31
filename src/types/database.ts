@@ -551,6 +551,28 @@ export type CardapioRow = {
   updated_at: string
 }
 
+export type RequisicaoTipo = 'compra' | 'conserto'
+export type RequisicaoUrgencia = 'baixa' | 'media' | 'alta'
+export type RequisicaoStatus = 'pendente' | 'aprovada' | 'concluida' | 'recusada'
+
+export type RequisicaoRow = {
+  id: string
+  tipo: RequisicaoTipo
+  titulo: string
+  descricao: string | null
+  urgencia: RequisicaoUrgencia
+  foto_path: string | null
+  status: RequisicaoStatus
+  motivo_recusa: string | null
+  solicitante_id: string | null
+  solicitante_nome: string
+  setor: Setor | null
+  decidido_por_nome: string | null
+  decidido_em: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type TaxonomiaRow = {
   id: string
   modulo: 'ficha_tecnica' | 'ficha_producao' | 'estoque' | 'pop'
@@ -714,6 +736,7 @@ export type Database = {
       freelancer_escalas: TableDef<FreelancerEscalaRow>
       cardapios: TableDef<CardapioRow>
       clientes: TableDef<ClienteRow>
+      requisicoes: TableDef<RequisicaoRow>
       sobre_nos_secoes: TableDef<SobreNosSecaoRow>
     }
     Views: {

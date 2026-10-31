@@ -37,6 +37,8 @@ const MIGRATED_MODULES: { key: string; to: string; title: string; desc: string; 
   },
   // Exclusivo da Cozinha + Administração (rota em App.tsx e RLS cardapios_*).
   { key: 'cardapio-raf', to: '/cardapio-raf', title: 'Cardápio RAF', desc: 'Cardápio semanal da cozinha', icon: 'cardapio', roles: 'cozinha' },
+  // Todo perfil menos freelancer (rota em App.tsx e RLS requisicoes_*): pedir compra/conserto fora da rotina.
+  { key: 'requisicao', to: '/requisicao', title: 'Requisição', desc: 'Pedir compra ou conserto', icon: 'requisicao', roles: 'todos' },
   { key: 'pops', to: '/pops', title: "POP's", desc: 'Procedimentos Operacionais Padrão', icon: 'pops', roles: 'todos' },
   { key: 'mapas', to: '/mapas', title: 'Mapas e Fluxogramas', desc: 'Layout do ambiente e fluxos de processo', icon: 'mapas', roles: 'todos' },
   // Igual ao protótipo (MODULE_ACCESS.freelancer = ['administrador']) — o

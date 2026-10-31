@@ -13,6 +13,7 @@ import { ReservasPage } from './features/reservas/ReservasPage'
 import { FichasTecnicasPage } from './features/fichas/FichasTecnicasPage'
 import { FichasProducaoPage } from './features/fichas/FichasProducaoPage'
 import { CardapioPage } from './features/cardapio/CardapioPage'
+import { RequisicoesPage } from './features/requisicoes/RequisicoesPage'
 import { MapasPage } from './features/mapas/MapasPage'
 import { FreelancerPage } from './features/freelancer/FreelancerPage'
 import { PopsPage } from './features/pops/PopsPage'
@@ -128,6 +129,14 @@ export default function App() {
             <Shell>
               {(isAdmin || profile?.setor === 'Cozinha') && !freelancer ? <CardapioPage /> : <Navigate to="/" replace />}
             </Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/requisicao"
+        element={
+          <ProtectedRoute>
+            <Shell>{!freelancer ? <RequisicoesPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />

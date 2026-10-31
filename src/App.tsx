@@ -14,6 +14,7 @@ import { FichasTecnicasPage } from './features/fichas/FichasTecnicasPage'
 import { FichasProducaoPage } from './features/fichas/FichasProducaoPage'
 import { CardapioPage } from './features/cardapio/CardapioPage'
 import { RequisicoesPage } from './features/requisicoes/RequisicoesPage'
+import { FinanceiroPage } from './features/financeiro/FinanceiroPage'
 import { MapasPage } from './features/mapas/MapasPage'
 import { FreelancerPage } from './features/freelancer/FreelancerPage'
 import { PopsPage } from './features/pops/PopsPage'
@@ -145,6 +146,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shell>{!freelancer ? <MapasPage /> : <Navigate to="/" replace />}</Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/financeiro"
+        element={
+          <ProtectedRoute>
+            <Shell>{isAdmin ? <FinanceiroPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />

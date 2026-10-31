@@ -573,6 +573,48 @@ export type RequisicaoRow = {
   updated_at: string
 }
 
+// Linha de item da nota guardada na conta (histórico do que foi comprado).
+export type ItemNotaSalvo = {
+  descricao: string
+  quantidade: number
+  unidade: string
+  valor_unitario: number
+  valor_total: number
+  estoque_item_id: string | null
+}
+
+export type NotaMapeamentoRow = {
+  id: string
+  fornecedor_chave: string
+  descricao_norm: string
+  estoque_item_id: string
+  updated_at: string
+}
+
+export type ContaPagarRow = {
+  id: string
+  descricao: string
+  fornecedor: string | null
+  categoria: string
+  valor: number
+  vencimento: string
+  observacoes: string | null
+  numero_nota: string | null
+  chave_acesso: string | null
+  fornecedor_cnpj: string | null
+  nota_foto_path: string | null
+  itens_nota: ItemNotaSalvo[] | null
+  grupo_id: string | null
+  parcela: number | null
+  parcelas: number | null
+  pago_em: string | null
+  valor_pago: number | null
+  forma_pagamento: string | null
+  criado_por: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type TaxonomiaRow = {
   id: string
   modulo: 'ficha_tecnica' | 'ficha_producao' | 'estoque' | 'pop'
@@ -737,6 +779,8 @@ export type Database = {
       cardapios: TableDef<CardapioRow>
       clientes: TableDef<ClienteRow>
       requisicoes: TableDef<RequisicaoRow>
+      contas_pagar: TableDef<ContaPagarRow>
+      nota_mapeamentos: TableDef<NotaMapeamentoRow>
       sobre_nos_secoes: TableDef<SobreNosSecaoRow>
     }
     Views: {
@@ -774,6 +818,10 @@ export type Database = {
       registrar_ajuste_estoque: {
         Args: { p_item_id: string; p_nova_quantidade: number; p_observacao?: string | null }
         Returns: EstoqueMovimentoRow
+      }
+      registrar_nota_compra: {
+        Args: { p_conta: Record<string, unknown>; p_itens: Record<string, unknown>[]; p_fornecedor_chave: string }
+        Returns: string
       }
       finalizar_recebimento: { Args: { p_pedido_id: string }; Returns: undefined }
       renomear_taxonomia: { Args: { p_id: string; p_novo: string }; Returns: undefined }

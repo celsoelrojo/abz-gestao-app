@@ -35,6 +35,7 @@ const OVERRIDES: Partial<Record<string, { strokeWidth?: number; scale?: number }
   cardapio: { scale: 1.7 },
   // Requisição: "requisicao" é o tile da Home; os 3 de baixo, os ícones rápidos do módulo.
   requisicao: { scale: 1.7 },
+  financeiro: { scale: 1.7 },
   'cardapio-adicionar': { scale: 2 },
   'cardapio-visualizar': { scale: 2 },
   'fichas-producao-hub': { scale: 2 },
@@ -220,6 +221,45 @@ const PATHS: Record<string, ReactNode> = {
   ),
   // Requisição: prancheta com a chave inglesa (compra/conserto); nos ícones
   // rápidos ganha o "+" (nova), o relógio (abertas) e o check (encerradas).
+  // Financeiro: cédula (tile da Home); nos ícones rápidos ganha o "+" (nova
+  // conta), o relógio (a pagar) e o check (pagas).
+  financeiro: (
+    <>
+      <rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2.6" />
+      <path d="M6 9.5v.01M18 14.5v.01" />
+    </>
+  ),
+  'financeiro-nova': (
+    <>
+      <rect x="2.5" y="7" width="15" height="11" rx="2" />
+      <circle cx="10" cy="12.5" r="2.4" />
+      <path d="M19.5 3v6" />
+      <path d="M16.5 6h6" />
+    </>
+  ),
+  // Ler nota: cupom com a lupa (a IA "lê" a foto).
+  'financeiro-nota': (
+    <>
+      <path d="M6 3.5h9a1 1 0 0 1 1 1V9" />
+      <path d="M6 3.5a1 1 0 0 0-1 1V20l2-1.2 2 1.2 2-1.2 1.4.8" />
+      <path d="M8 8h5M8 11.5h3" />
+      <circle cx="16.5" cy="15" r="3" />
+      <path d="M18.7 17.2 21.5 20" />
+    </>
+  ),
+  'financeiro-abertas': (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  'financeiro-pagas': (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M8 12.3l2.8 2.8 5.2-5.6" />
+    </>
+  ),
   requisicao: (
     <>
       <path d="M8 4.5h8a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z" />

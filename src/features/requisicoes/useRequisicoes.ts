@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import { reduzirImagem } from '../../lib/imagem'
 import { supabase } from '../../lib/supabaseClient'
 import type { RequisicaoRow, RequisicaoStatus, RequisicaoTipo, RequisicaoUrgencia } from '../../types/database'
 
@@ -96,21 +97,6 @@ export async function excluirRequisicao(r: RequisicaoRow): Promise<void> {
 }
 
 // ---- Foto (bucket privado `requisicoes-fotos`, pasta = id de quem sobe) ----
-
-// Celular tira foto de vários MB; reduz pra no máximo 1600px de lado em JPEG
-// antes de subir (o suficiente pra ver o defeito / o item).
-export async function reduzirImagem(file: File, ladoMax = 1600): Promise<Blob> {
-  const bitmap = await createImageBitmap(file)
-  const escala = Math.min(1, ladoMax / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * escala)
-  canvas.height = Math.round(bitmap.height * escala)
-  canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close()
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Não foi possível processar a imagem.'))), 'image/jpeg', 0.82),
-  )
-}
 
 export async function uploadRequisicaoFoto(userId: string, file: File): Promise<string> {
   const blob = await reduzirImagem(file)

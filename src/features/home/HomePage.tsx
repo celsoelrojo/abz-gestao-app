@@ -43,6 +43,8 @@ const MIGRATED_MODULES: { key: string; to: string; title: string; desc: string; 
   { key: 'mapas', to: '/mapas', title: 'Mapas e Fluxogramas', desc: 'Layout do ambiente e fluxos de processo', icon: 'mapas', roles: 'todos' },
   // Igual ao protótipo (MODULE_ACCESS.freelancer = ['administrador']) — o
   // único módulo restrito só ao Administrador, sem exceção pra Gestor.
+  // Exclusivo do Administrador (rota em App.tsx e RLS contas_pagar_admin_all).
+  { key: 'financeiro', to: '/financeiro', title: 'Financeiro', desc: 'Contas a pagar e controle de custos', icon: 'financeiro', roles: 'admin' },
   { key: 'freelancer', to: '/freelancer', title: 'Freelancer', desc: 'Cadastro e escala de freelancers', icon: 'freelancer', roles: 'admin' },
   { key: 'contas', to: '/contas', title: 'Gerenciar Contas', desc: 'Usuários e acessos', icon: 'accounts', roles: 'admin' },
   { key: 'impressao', to: '/impressao', title: 'Configuração de Impressora', desc: 'Etiquetas de produção', icon: 'gear', roles: 'manager' },

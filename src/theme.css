@@ -1098,3 +1098,15 @@ input, textarea, select { font-family: inherit; }
   padding: 9px 12px; border-radius: var(--radius-sm); font-size: 0.86rem;
 }
 .reserva-filters input[type="text"], .list-search-filters input[type="text"] { flex: 1; min-width: 200px; }
+
+/* Financeiro: painel de resumo das contas a pagar (4 cartões lado a lado,
+   2 por linha no celular). */
+.fin-resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.fin-resumo-card {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.fin-resumo-titulo { font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.fin-resumo-valor { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.fin-resumo-qtd { font-size: 0.76rem; color: var(--text-secondary); }

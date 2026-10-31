@@ -13,6 +13,7 @@ export const AUDIT_TABLE_LABELS: Record<string, string> = {
   fichas_producao: 'Fichas de Produção',
   cardapios: 'Cardápio RAF',
   requisicoes: 'Requisições',
+  contas_pagar: 'Financeiro — Contas a pagar',
 }
 
 export const AUDIT_TABLES = Object.keys(AUDIT_TABLE_LABELS)

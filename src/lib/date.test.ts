@@ -1,5 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { formatDateBR, isoDate, weekdayNameForDate } from './date'
+import { diaOperacional, formatDateBR, isoDate, weekdayNameForDate } from './date'
+
+describe('diaOperacional', () => {
+  it('antes das 5h ainda é o dia anterior (fechamento de madrugada)', () => {
+    expect(isoDate(diaOperacional(new Date(2026, 10, 3, 0, 0)))).toBe('2026-11-02')
+    expect(isoDate(diaOperacional(new Date(2026, 10, 3, 2, 30)))).toBe('2026-11-02')
+    expect(isoDate(diaOperacional(new Date(2026, 10, 3, 4, 59)))).toBe('2026-11-02')
+  })
+
+  it('às 5h em diante já é o dia do calendário', () => {
+    expect(isoDate(diaOperacional(new Date(2026, 10, 3, 5, 0)))).toBe('2026-11-03')
+    expect(isoDate(diaOperacional(new Date(2026, 10, 3, 23, 59)))).toBe('2026-11-03')
+  })
+
+  it('cruza virada de mês e de ano', () => {
+    expect(isoDate(diaOperacional(new Date(2026, 11, 1, 1, 0)))).toBe('2026-11-30')
+    expect(isoDate(diaOperacional(new Date(2027, 0, 1, 3, 0)))).toBe('2026-12-31')
+  })
+
+  it('devolve sempre meia-noite, pra dar dias de atraso exatos', () => {
+    const d = diaOperacional(new Date(2026, 10, 3, 14, 37))
+    expect([d.getHours(), d.getMinutes(), d.getSeconds()]).toEqual([0, 0, 0])
+  })
+})
 
 describe('isoDate', () => {
   it('formata em YYYY-MM-DD usando o horário local (não UTC)', () => {

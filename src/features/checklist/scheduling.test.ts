@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { findOverdueInfo, getUpcomingDays, getWeekDates, isTaskScheduledOn } from './scheduling'
-import { isoDate } from '../../lib/date'
+import { diaOperacional, isoDate } from '../../lib/date'
 import type { ChecklistTaskRow } from '../../types/database'
 
 const ALL_WEEKDAYS: ChecklistTaskRow['dias'] = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
@@ -148,6 +148,16 @@ describe('findOverdueInfo', () => {
     const week = getWeekDates(d('2026-08-31'))
     const info = findOverdueInfo(task, week, d('2026-08-31'), [])
     expect(info).toBeNull()
+  })
+
+  it('fechamento de madrugada: tarefa de ontem só fica atrasada depois das 5h', () => {
+    const task = makeTask({ periodicidade: 'Semanal', dias: ['Segunda'] })
+    // Terça 03/11, 01:00 → dia operacional ainda é segunda 02/11.
+    const antes = diaOperacional(new Date(2026, 10, 3, 1, 0))
+    expect(findOverdueInfo(task, getWeekDates(antes), antes, [])).toBeNull()
+    // Terça 03/11, 05:00 → virou: a tarefa de segunda passa a atrasada.
+    const depois = diaOperacional(new Date(2026, 10, 3, 5, 0))
+    expect(findOverdueInfo(task, getWeekDates(depois), depois, [])).toEqual({ missedDate: '2026-11-02', daysLate: 1 })
   })
 
   it('tarefa inativa nunca acusa atraso', () => {

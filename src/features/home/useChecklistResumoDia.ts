@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabaseClient'
-import { isoDate } from '../../lib/date'
+import { diaOperacional, isoDate } from '../../lib/date'
 import { isTaskScheduledOn } from '../checklist/scheduling'
 import type { ChecklistAgendaRow, ChecklistConcluidaRow, Setor } from '../../types/database'
 
@@ -25,7 +25,7 @@ const SETORES: Setor[] = ['Bar', 'Cozinha', 'Salão']
 // checklist_tasks esconderia. "Agendada hoje?" continua calculado aqui com a
 // MESMA função já testada do módulo Checklist (scheduling.ts), em vez de
 // duplicar essa lógica em SQL.
-export function useChecklistResumoDia(dataIso: string = isoDate(new Date())) {
+export function useChecklistResumoDia(dataIso: string = isoDate(diaOperacional())) {
   return useQuery({
     queryKey: CHECKLIST_RESUMO_DIA_KEY(dataIso),
     queryFn: async (): Promise<ChecklistResumoDia> => {

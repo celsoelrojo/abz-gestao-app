@@ -8,7 +8,21 @@ export function isoDate(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-const WEEKDAYS_BY_JS_INDEX = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+// O bar pode funcionar até as 2h; o expediente só "vira" às 5h. Antes disso,
+// o dia operacional ainda é o de ontem — o fechamento feito de madrugada
+// conta como do dia anterior, não como tarefa atrasada.
+export const HORA_VIRADA_DIA = 5
+
+// Meia-noite do dia operacional de `agora` (sempre à 00:00, pra bater com as
+// datas de agenda e dar contagem exata de dias de atraso).
+export function diaOperacional(agora: Date = new Date()): Date {
+  const d = new Date(agora)
+  d.setHours(d.getHours() - HORA_VIRADA_DIA)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+const WEEKDAYS_BY_JS_INDEX =['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
 export function weekdayNameForDate(date: Date): string {
   return WEEKDAYS_BY_JS_INDEX[date.getDay()]

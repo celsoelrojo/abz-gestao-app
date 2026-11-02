@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
 import { confirmar } from '../../store/confirmStore'
 import { formatDateBR, formatWeekdayLong, isoDate, weekdayNameForDate } from '../../lib/date'
+import { useDiaOperacional } from '../../lib/useDiaOperacional'
 import { supabase } from '../../lib/supabaseClient'
 import { toPrinterConfig } from '../../lib/printing/mappers'
 import { enqueuePrintJob } from '../../lib/printing/printQueue'
@@ -35,13 +36,6 @@ import type {
 
 const SETORES: Setor[] = ['Bar', 'Cozinha', 'Salão']
 
-const today = new Date()
-const todayIso = isoDate(today)
-const week = getWeekDates(today)
-const weekStartIso = isoDate(week[0])
-const upcomingDays = getUpcomingDays(5, today)
-const upcomingEndIso = isoDate(upcomingDays[upcomingDays.length - 1])
-
 function keyFor(taskId: number, dateIso: string) {
   return `${taskId}:${dateIso}`
 }
@@ -49,6 +43,14 @@ function keyFor(taskId: number, dateIso: string) {
 export function ChecklistPage() {
   const profile = useAuthStore((s) => s.profile)
   const queryClient = useQueryClient()
+  // "Hoje" é o dia operacional: só vira às 5h, então o fechamento feito de
+  // madrugada ainda é do dia anterior e não aparece como atrasado.
+  const today = useDiaOperacional()
+  const todayIso = isoDate(today)
+  const week = useMemo(() => getWeekDates(today), [today])
+  const weekStartIso = isoDate(week[0])
+  const upcomingDays = useMemo(() => getUpcomingDays(5, today), [today])
+  const upcomingEndIso = isoDate(upcomingDays[upcomingDays.length - 1])
   const { data: tasks, isLoading: loadingTasks } = useChecklistTasks()
   const { data: conclusoesRange, isLoading: loadingConclusoes } = useChecklistConclusoesRange(
     weekStartIso,
@@ -138,7 +140,7 @@ export function ChecklistPage() {
       if (info) map.set(t.id, info)
     })
     return map
-  }, [visibleTasks, completedDatesByTask])
+  }, [visibleTasks, completedDatesByTask, week, today])
 
   // Seção exclusiva do Administrador — "Pagar freelancer" é sincronizada
   // automaticamente pela Escala (trigger no banco) e nunca aparece nas listas
@@ -157,7 +159,7 @@ export function ChecklistPage() {
       if (info) map.set(t.id, info)
     })
     return map
-  }, [freelancerPagamentoTasks, completedDatesByTask])
+  }, [freelancerPagamentoTasks, completedDatesByTask, week, today])
 
   // Tarefas concluídas hoje com justificativa de atraso — ficam visíveis no
   // painel "Tarefas Atrasadas" (só pra quem gerencia) até serem apagadas.
@@ -170,7 +172,7 @@ export function ChecklistPage() {
       .filter((c) => isFullAdmin(profile) || !c.justificativa_atraso_dismissed)
       .map((c) => ({ conclusao: c, task: visibleTasks.find((t) => t.id === c.task_id) }))
       .filter((e): e is { conclusao: ChecklistConclusaoRow; task: ChecklistTaskRow } => !!e.task)
-  }, [conclusoesRange, visibleTasks, profile])
+  }, [conclusoesRange, visibleTasks, profile, todayIso])
 
   const todayGroups = useMemo(() => {
     const scheduledToday = visibleTasks.filter((t) => isTaskScheduledOn(t, today) && !overdueByTaskId.has(t.id))
@@ -180,7 +182,7 @@ export function ChecklistPage() {
       groups.get(t.setor)!.push(t)
     })
     return [...groups.entries()]
-  }, [visibleTasks, overdueByTaskId])
+  }, [visibleTasks, overdueByTaskId, today])
 
   // Administrador vê tarefas de todos os setores misturadas — sem sinalizar
   // de qual setor é cada uma, fica ambíguo. Gestor de setor e perfis de
@@ -188,17 +190,19 @@ export function ChecklistPage() {
   // diferença pra eles e a lista fica simples (só por dia).
   const showSetorBadges = isFullAdmin(profile)
 
-  function buildUpcomingDayGroups(tasksForSetor: ChecklistTaskRow[]) {
-    return upcomingDays
-      .map((date) => {
-        const dateIso = isoDate(date)
-        const dayTasks = tasksForSetor.filter((t) => isTaskScheduledOn(t, date))
-        return { date, dateIso, weekday: weekdayNameForDate(date), tasks: dayTasks }
-      })
-      .filter((g) => g.tasks.length > 0)
-  }
+  const buildUpcomingDayGroups = useCallback(
+    (tasksForSetor: ChecklistTaskRow[]) =>
+      upcomingDays
+        .map((date) => {
+          const dateIso = isoDate(date)
+          const dayTasks = tasksForSetor.filter((t) => isTaskScheduledOn(t, date))
+          return { date, dateIso, weekday: weekdayNameForDate(date), tasks: dayTasks }
+        })
+        .filter((g) => g.tasks.length > 0),
+    [upcomingDays],
+  )
 
-  const upcomingGroups = useMemo(() => buildUpcomingDayGroups(visibleTasks), [visibleTasks])
+  const upcomingGroups = useMemo(() => buildUpcomingDayGroups(visibleTasks), [visibleTasks, buildUpcomingDayGroups])
 
   const upcomingGroupsBySetor = useMemo(() => {
     if (!showSetorBadges) return null
@@ -206,7 +210,7 @@ export function ChecklistPage() {
       setor,
       days: buildUpcomingDayGroups(visibleTasks.filter((t) => t.setor === setor)),
     })).filter((block) => block.days.length > 0)
-  }, [visibleTasks, showSetorBadges])
+  }, [visibleTasks, showSetorBadges, buildUpcomingDayGroups])
 
   const canManage = isManager(profile, undefined)
 

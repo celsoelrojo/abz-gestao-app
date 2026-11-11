@@ -20,14 +20,15 @@ import {
   useContasPagar,
   useContasPagarRealtime,
 } from './useContasPagar'
+import { FinanceiroAbas } from './FinanceiroAbas'
 import { ContaFormModal } from './ContaFormModal'
 import { PagarModal } from './PagarModal'
 import { LerNotaModal } from './LerNotaModal'
 import { NotaDetalheModal } from './NotaDetalheModal'
 import type { ContaPagarRow } from '../../types/database'
 
-// Financeiro, etapa 1: Contas a pagar. Exclusivo do Administrador (rota em
-// App.tsx e RLS contas_pagar_admin_all). O CMV entra como a próxima aba.
+// Financeiro, parte 1: Contas a pagar. Exclusivo do Administrador (rota em
+// App.tsx e RLS contas_pagar_admin_all). O CMV é a outra aba (CmvPage).
 export function FinanceiroPage() {
   const queryClient = useQueryClient()
   const { data: contas, isLoading } = useContasPagar()
@@ -107,6 +108,8 @@ export function FinanceiroPage() {
           <p className="page-subtitle">Contas a pagar</p>
         </div>
       </div>
+
+      <FinanceiroAbas />
 
       <div className="fin-resumo">
         <ResumoCard titulo="Em aberto" valor={resumo.emAberto.total} qtd={resumo.emAberto.quantidade} />

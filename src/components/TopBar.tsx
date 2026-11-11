@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 
 const ROLE_LABELS: Record<string, string> = {
   administrador: 'Administrador',
+  gestor_geral: 'Gestor Geral',
   gestor_bar: 'Gestor de Bar',
   gestor_cozinha: 'Gestor de Cozinha',
   gestor_salao: 'Gestor de Salão',

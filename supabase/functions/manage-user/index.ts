@@ -5,7 +5,7 @@
 // simples `update` em `profiles`, coberto pela policy `profiles_admin_write`
 // (RLS), então o app chama o Supabase direto pra isso.
 //
-// Só o Administrador pode chamar — a checagem é feita aqui no servidor, não
+// Só Administrador e Gestor Geral podem chamar — a checagem é feita aqui no servidor, não
 // confiando em nada vindo do cliente. A service_role key só existe dentro
 // desta função (injetada automaticamente pelo Supabase); nunca é enviada
 // pro browser.
@@ -80,8 +80,13 @@ Deno.serve(async (req) => {
     .eq('id', userData.user.id)
     .single()
 
-  if (callerProfile?.role !== 'administrador') {
-    return json({ error: 'Apenas Administrador pode gerenciar contas' }, 403)
+  // Administrador e Gestor Geral gerenciam contas; o Gestor Geral só as de
+  // perfis comuns (nunca cria nem mexe em Administrador/Gestor Geral, senão
+  // poderia se promover ou trocar a senha de quem manda nele).
+  const GESTAO = ['administrador', 'gestor_geral']
+  const chamadorEhGestorGeral = callerProfile?.role === 'gestor_geral'
+  if (callerProfile?.role !== 'administrador' && !chamadorEhGestorGeral) {
+    return json({ error: 'Apenas Administrador ou Gestor Geral pode gerenciar contas' }, 403)
   }
 
   const body = (await req.json()) as Body
@@ -92,7 +97,10 @@ Deno.serve(async (req) => {
     if (!body.nome || !body.username || !body.password || !body.role) {
       return json({ error: 'Campos obrigatórios faltando' }, 400)
     }
-    if (body.role !== 'administrador' && !body.setor) {
+    if (chamadorEhGestorGeral && GESTAO.includes(body.role)) {
+      return json({ error: 'Só o Administrador cria contas de Administrador ou Gestor Geral' }, 403)
+    }
+    if (!GESTAO.includes(body.role) && !body.setor) {
       return json({ error: 'Setor é obrigatório para este perfil' }, 400)
     }
 
@@ -105,7 +113,7 @@ Deno.serve(async (req) => {
         nome: body.nome,
         username: body.username,
         role: body.role,
-        setor: body.role === 'administrador' ? '' : body.setor,
+        setor: GESTAO.includes(body.role) ? '' : body.setor,
         status: 'ativa',
       },
     })
@@ -119,6 +127,12 @@ Deno.serve(async (req) => {
   if (body.action === 'reset_password') {
     if (!body.userId || !body.newPassword || body.newPassword.length < 6) {
       return json({ error: 'Senha inválida (mínimo 6 caracteres)' }, 400)
+    }
+    if (chamadorEhGestorGeral) {
+      const { data: alvo } = await adminClient.from('profiles').select('role').eq('id', body.userId).single()
+      if (!alvo || GESTAO.includes(alvo.role)) {
+        return json({ error: 'Só o Administrador redefine a senha de contas de gestão' }, 403)
+      }
     }
     const { error: updateError } = await adminClient.auth.admin.updateUserById(body.userId, {
       password: body.newPassword,

@@ -29,19 +29,23 @@ export function situacaoConta(conta: Pick<ContaPagarRow, 'pago_em' | 'vencimento
 // Vírgula é o decimal quando presente (e então os pontos são milhar); sem
 // vírgula, um único ponto com 1–2 dígitos depois é decimal ("12.5"), qualquer
 // outro uso do ponto é milhar ("1.234").
-export function parseValorBR(texto: string): number | null {
+// `casas` = casas decimais mantidas (2 pra dinheiro; 4 pro custo por unidade do
+// estoque, onde um grama custa centavos de centavo). Com mais de 2 casas, "0.0312"
+// também é lido como decimal (começa com zero, então não pode ser milhar).
+export function parseValorBR(texto: string, casas = 2): number | null {
   const limpo = texto.replace(/[^\d.,]/g, '')
   if (!limpo) return null
   let numero: string
   if (limpo.includes(',')) {
     numero = limpo.replace(/\./g, '').replace(',', '.')
-  } else if (/^\d+\.\d{1,2}$/.test(limpo)) {
+  } else if (/^\d+\.\d{1,2}$/.test(limpo) || (casas > 2 && /^0\.\d+$/.test(limpo))) {
     numero = limpo
   } else {
     numero = limpo.replace(/\./g, '')
   }
   const n = Number(numero)
-  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null
+  const fator = 10 ** casas
+  return Number.isFinite(n) ? Math.round(n * fator) / fator : null
 }
 
 export function formatBRL(valor: number): string {

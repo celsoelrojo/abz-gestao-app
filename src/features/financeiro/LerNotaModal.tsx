@@ -1,19 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { confirmar } from '../../store/confirmStore'
-import { isoDate } from '../../lib/date'
+import { diaOperacional, isoDate } from '../../lib/date'
 import { useEstoqueItens, ESTOQUE_ITENS_KEY, ESTOQUE_MOVIMENTOS_KEY } from '../estoque/useEstoque'
 import { useQueryClient } from '@tanstack/react-query'
 import { CONTA_CATEGORIAS, FORMAS_PAGAMENTO } from './financeiroConstants'
 import { lerXmlNfe } from './nfeXml'
 import { formatBRL, parseValorBR } from './contaHelpers'
 import {
+  candidatosProduto,
   chaveFornecedor,
   divergenciaTotal,
+  fatorDeConversao,
+  fatorPorUnidades,
   normalizarTexto,
   notaFormError,
+  quantidadeNoEstoque,
   somaItens,
   sugerirProduto,
+  unidadeDaNota,
   type NotaLida,
   type SugestaoProduto,
 } from './notaHelpers'
@@ -25,6 +30,8 @@ import {
   uploadNotaFoto,
   useNotaMapeamentos,
 } from './useNotaFiscal'
+import { formatCusto, formatQuantidade } from './cmvHelpers'
+import { ProdutoNotaPicker } from './ProdutoNotaPicker'
 import type { ContaPagarRow, EstoqueItemRow } from '../../types/database'
 
 interface LinhaItem {
@@ -33,11 +40,16 @@ interface LinhaItem {
   unidade: string
   valor_unitario: number
   valor_total: number
-  produtoTexto: string
+  produtoId: string | null
   origem: SugestaoProduto['origem'] | null
+  // Unidades do estoque por 1 da nota (1 CX = 12 UN → 12); vem do vínculo aprendido.
+  fator: number
   darEntrada: boolean
   qtdEntrada: string
 }
+
+const paraNumero = (texto: string) => Number(texto.replace(',', '.')) || 0
+const paraTexto = (n: number) => String(Number(n.toFixed(3))).replace('.', ',')
 
 const CATEGORIA_POR_SETOR: Record<string, string> = {
   Bar: 'Mercadoria – Bebidas',
@@ -97,12 +109,10 @@ export function LerNotaModal({
     [previaUrl],
   )
 
-  const produtos = useMemo(() => (estoque ?? []).map((i) => ({ id: i.id, title: i.title })), [estoque])
-  const porTitulo = useMemo(() => {
-    const m = new Map<string, EstoqueItemRow>()
-    for (const i of estoque ?? []) m.set(i.title.toLowerCase(), i)
-    return m
-  }, [estoque])
+  const [escolhendo, setEscolhendo] = useState<number | null>(null)
+
+  const produtos = useMemo(() => (estoque ?? []).map((i) => ({ id: i.id, title: i.title, marca: i.marca })), [estoque])
+  const porId = useMemo(() => new Map((estoque ?? []).map((i) => [i.id, i] as const)), [estoque])
 
   // Foto: a função ler-nota (IA) devolve os dados; vai pra conferência.
   async function ler() {
@@ -141,18 +151,21 @@ export function LerNotaModal({
     const novasLinhas: LinhaItem[] = nota.itens.map((i) => {
       const sug = sugerirProduto(i.descricao, fornecedorChave, produtos, mapeamentos ?? [])
       const prod = sug ? (estoque ?? []).find((e) => e.id === sug.estoqueItemId) : undefined
+      // Conversão: a que já foi aprendida; senão, a deduzida das unidades; senão, 1.
+      const fator = (sug?.origem === 'aprendido' ? sug.fator : prod ? fatorPorUnidades(i.unidade, prod) : null) ?? 1
       return {
         ...i,
-        produtoTexto: prod?.title ?? '',
+        produtoId: prod?.id ?? null,
         origem: sug?.origem ?? null,
-        // Só o que o app JÁ aprendeu vem marcado pra dar entrada; o que é só
-        // "parecido" fica desmarcado até a pessoa conferir o produto.
-        darEntrada: sug?.origem === 'aprendido',
-        qtdEntrada: String(i.quantidade || ''),
+        fator,
+        // Já vem tudo preenchido (produto, entrada e quantidade convertida); o
+        // que é só "parecido" fica marcado "Sugerido, confira" na conferência.
+        darEntrada: !!prod,
+        qtdEntrada: prod && i.quantidade ? paraTexto(quantidadeNoEstoque(i.quantidade, fator)) : '',
       }
     })
 
-    const primeiro = novasLinhas.map((l) => porTitulo.get(l.produtoTexto.toLowerCase())).find(Boolean)
+    const primeiro = novasLinhas.map((l) => (l.produtoId ? porId.get(l.produtoId) : undefined)).find(Boolean)
     setLeitura(nota)
     setFoto(fotoReduzida)
     setDescricao(`${nota.numero_nota ? `NF ${nota.numero_nota}` : 'Nota fiscal'}${nota.fornecedor ? ` – ${nota.fornecedor}` : ''}`)
@@ -177,13 +190,30 @@ export function LerNotaModal({
     setLinhas((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...parcial } : l)))
   }
 
-  function escolherProduto(i: number, texto: string) {
-    const prod = porTitulo.get(texto.trim().toLowerCase())
+  function escolherProduto(i: number, prod: EstoqueItemRow | null) {
+    setEscolhendo(null)
+    const l = linhas[i]
+    if (!prod) {
+      // Sem vínculo: nada entra no estoque.
+      atualizarLinha(i, { produtoId: null, origem: null, fator: 1, darEntrada: false })
+      return
+    }
+    if (prod.id === l.produtoId) return
+    // Se este fornecedor já teve esta descrição ligada a este produto, a conversão vem de lá.
+    const aprendido = (mapeamentos ?? []).find(
+      (m) =>
+        m.fornecedor_chave === chaveFornecedor(cnpj, fornecedor) &&
+        m.descricao_norm === normalizarTexto(l.descricao) &&
+        m.estoque_item_id === prod.id,
+    )
+    const fator = (aprendido && aprendido.fator > 0 ? aprendido.fator : fatorPorUnidades(l.unidade, prod)) ?? 1
     atualizarLinha(i, {
-      produtoTexto: texto,
-      // Escolha manual vale como conferida; apagar o produto desmarca a entrada.
-      origem: prod ? 'aprendido' : null,
-      darEntrada: prod ? true : false,
+      produtoId: prod.id,
+      // Escolha manual vale como conferida.
+      origem: 'aprendido',
+      fator,
+      darEntrada: true,
+      qtdEntrada: l.quantidade ? paraTexto(quantidadeNoEstoque(l.quantidade, fator)) : '',
     })
   }
 
@@ -209,13 +239,15 @@ export function LerNotaModal({
     if (duplicadaPorChave) return setErro('Esta nota já foi lançada (mesma chave de acesso).')
     if (duplicadaPorNumero && !(await confirmar(`Já existe uma conta com a nota nº ${numeroNota} deste fornecedor. Lançar mesmo assim?`))) return
 
-    const resolvidas = linhas.map((l) => ({ l, prod: porTitulo.get(l.produtoTexto.trim().toLowerCase()) }))
+    const resolvidas = linhas.map((l) => ({ l, prod: l.produtoId ? porId.get(l.produtoId) : undefined }))
     const comEntrada = resolvidas.filter(({ l, prod }) => prod && l.darEntrada)
     for (const { l } of comEntrada) {
-      if (!(Number(l.qtdEntrada.replace(',', '.')) > 0)) return setErro(`Informe a quantidade de entrada de "${l.descricao}".`)
+      if (!(paraNumero(l.qtdEntrada) > 0)) return setErro(`Informe a quantidade de entrada de "${l.descricao}".`)
     }
+    const sugeridos = comEntrada.filter(({ l }) => l.origem === 'sugerido').length
     const resumoEstoque = comEntrada.length
-      ? `\nDar entrada no estoque de ${comEntrada.length} ${comEntrada.length === 1 ? 'produto' : 'produtos'}.`
+      ? `\nDar entrada no estoque de ${comEntrada.length} ${comEntrada.length === 1 ? 'produto' : 'produtos'}.` +
+        (sugeridos ? `\n${sugeridos} ${sugeridos === 1 ? 'vínculo foi só sugerido' : 'vínculos foram só sugeridos'} pelo nome: confirme que estão certos.` : '')
       : '\nNenhuma entrada de estoque será feita.'
     if (!(await confirmar(`Lançar a nota de ${formatBRL(valor)}${jaPaga ? ' (já paga)' : ''}?${resumoEstoque}`))) return
 
@@ -232,6 +264,8 @@ export function LerNotaModal({
           categoria,
           valor,
           vencimento,
+          // Sem data de emissão legível, vale o dia em que a nota está sendo lançada.
+          dataCompra: leitura?.data_emissao || isoDate(diaOperacional()),
           observacoes,
           numeroNota,
           chaveAcesso: chave,
@@ -251,9 +285,12 @@ export function LerNotaModal({
           .filter(({ prod }) => prod)
           .map(({ l, prod }) => ({
             estoqueItemId: prod!.id,
-            quantidade: Number(l.qtdEntrada.replace(',', '.')) || 0,
+            quantidade: paraNumero(l.qtdEntrada),
             darEntrada: l.darEntrada,
             descricaoNorm: normalizarTexto(l.descricao),
+            valorTotal: l.valor_total,
+            // O que a pessoa conferiu vira a conversão lembrada pra próxima nota.
+            fator: (l.darEntrada && fatorDeConversao(l.quantidade, paraNumero(l.qtdEntrada))) || l.fator,
           })),
         chaveFornecedor(cnpj, fornecedor),
       )
@@ -272,7 +309,10 @@ export function LerNotaModal({
     }
   }
 
+  const linhaEscolhendo = escolhendo != null ? linhas[escolhendo] : undefined
+
   return (
+    <>
     <div className="modal-overlay">
       <div className="modal modal-wide">
         <div className="modal-header">
@@ -412,7 +452,10 @@ export function LerNotaModal({
               </div>
             )}
 
-            <h4 className="section-label">Itens da nota ({linhas.length})</h4>
+            <h4 className="section-label">
+              Itens da nota ({linhas.length}
+              {linhas.length > 0 && ` · ${linhas.filter((l) => l.produtoId).length} vinculados ao estoque`})
+            </h4>
             {linhas.length > 0 && (
               <p className="field-hint">
                 Soma dos itens: {formatBRL(somaItens(itensLidos))}
@@ -424,54 +467,87 @@ export function LerNotaModal({
                 )}
               </p>
             )}
-            <datalist id="produtos-estoque-nota">
-              {(estoque ?? []).map((i) => (
-                <option key={i.id} value={i.title} />
-              ))}
-            </datalist>
             <div className="manage-list">
               {linhas.map((l, i) => {
-                const prod = porTitulo.get(l.produtoTexto.trim().toLowerCase())
+                const prod = l.produtoId ? porId.get(l.produtoId) : undefined
+                const qtdEstoque = paraNumero(l.qtdEntrada)
+                // Enquanto não há vínculo conferido, oferece os nomes do estoque que aparecem na descrição.
+                const sugestoes = l.origem === 'aprendido' ? [] : candidatosProduto(l.descricao, estoque ?? []).filter((p) => p.id !== l.produtoId)
+                const unidadeDiferente = !!prod && !!l.unidade && unidadeDaNota(l.unidade) !== prod.unidade
+                const mudouUnidade = prod && l.darEntrada && qtdEstoque > 0 && l.quantidade > 0 && qtdEstoque !== l.quantidade
                 return (
                   <div className="manage-row" key={i} style={{ display: 'block' }}>
                     <strong>{l.descricao}</strong>
                     <span className="field-hint">
-                      {l.quantidade} {l.unidade} × {formatBRL(l.valor_unitario)} = {formatBRL(l.valor_total)}
+                      Na nota: {formatQuantidade(l.quantidade)} {l.unidade} × {formatBRL(l.valor_unitario)} = {formatBRL(l.valor_total)}
                     </span>
-                    <div className="field" style={{ marginTop: 8 }}>
-                      <label>
-                        Produto do estoque{' '}
-                        {l.origem === 'sugerido' && prod && <em style={{ color: 'var(--gold-bright)' }}>— sugerido, confira</em>}
-                        {l.origem === 'aprendido' && prod && <em style={{ color: 'var(--success)' }}>— reconhecido</em>}
-                      </label>
-                      <input
-                        list="produtos-estoque-nota"
-                        value={l.produtoTexto}
-                        onChange={(e) => escolherProduto(i, e.target.value)}
-                        placeholder="Digite para buscar (deixe vazio se não for para o estoque)"
-                      />
+
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                      {prod ? (
+                        <>
+                          <span>
+                            <strong>{prod.title}</strong>
+                            {prod.marca ? ` · ${prod.marca}` : ''}
+                            <span className="field-hint" style={{ display: 'inline', marginLeft: 6 }}>
+                              saldo {formatQuantidade(prod.quantidade)} {prod.unidade.toLowerCase()}
+                            </span>
+                          </span>
+                          {l.origem === 'sugerido' && <span className="badge-status badge-status-pendente">Sugerido, confira</span>}
+                          {l.origem === 'aprendido' && <span className="badge-status badge-status-ativa">Vinculado</span>}
+                        </>
+                      ) : (
+                        <span className="badge-status badge-status-bloqueada">Sem vínculo</span>
+                      )}
+                      <button type="button" className="btn btn-ghost" onClick={() => setEscolhendo(i)}>
+                        {prod ? 'Trocar produto' : 'Vincular produto'}
+                      </button>
                     </div>
+
+                    {sugestoes.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                        <span className="field-hint">Parece ser:</span>
+                        {sugestoes.map((p) => (
+                          <button key={p.id} type="button" className="btn btn-ghost" onClick={() => escolherProduto(i, p)}>
+                            {p.title}
+                            {p.marca ? ` · ${p.marca}` : ''}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {prod && (
-                      <div className="field-row" style={{ alignItems: 'center' }}>
+                      <div style={{ marginTop: 8 }}>
                         <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <input
                             type="checkbox"
                             checked={l.darEntrada}
-                            onChange={(e) => atualizarLinha(i, { darEntrada: e.target.checked })}
+                            onChange={(e) =>
+                              atualizarLinha(i, {
+                                darEntrada: e.target.checked,
+                                qtdEntrada: l.qtdEntrada || (l.quantidade ? paraTexto(quantidadeNoEstoque(l.quantidade, l.fator)) : ''),
+                              })
+                            }
                           />
                           Dar entrada no estoque
                         </label>
                         {l.darEntrada && (
-                          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            Quantidade
+                          <div className="field" style={{ marginTop: 6 }}>
+                            <label>Quantidade que entra no estoque ({prod.unidade.toLowerCase()})</label>
                             <input
                               inputMode="decimal"
                               value={l.qtdEntrada}
                               onChange={(e) => atualizarLinha(i, { qtdEntrada: e.target.value })}
-                              style={{ maxWidth: 90 }}
+                              style={{ maxWidth: 120 }}
                             />
-                            {prod.unidade} (unidade do estoque)
-                          </label>
+                            <span className="field-hint">
+                              {mudouUnidade
+                                ? `Conversão: 1 ${l.unidade || 'da nota'} = ${formatQuantidade(qtdEstoque / l.quantidade)} ${prod.unidade.toLowerCase()} (o app lembra pra próxima nota). `
+                                : unidadeDiferente
+                                  ? `A nota vem em ${l.unidade} e o estoque é em ${prod.unidade.toLowerCase()}: confira a quantidade. `
+                                  : 'Mesma unidade do estoque. '}
+                              {qtdEstoque > 0 && l.valor_total > 0 && `Custo: ${formatCusto(l.valor_total / qtdEstoque)} por ${prod.unidade.toLowerCase()}.`}
+                            </span>
+                          </div>
                         )}
                       </div>
                     )}
@@ -498,5 +574,15 @@ export function LerNotaModal({
         )}
       </div>
     </div>
+    {linhaEscolhendo && (
+      <ProdutoNotaPicker
+        descricaoNota={linhaEscolhendo.descricao}
+        produtos={estoque ?? []}
+        selecionadoId={linhaEscolhendo.produtoId}
+        onEscolher={(p) => escolherProduto(escolhendo as number, p)}
+        onClose={() => setEscolhendo(null)}
+      />
+    )}
+    </>
   )
 }

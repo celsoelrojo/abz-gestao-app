@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isFullAdmin, isManager, isSetorManager } from './authStore'
+import { isAdministrador, isFullAdmin, isGestorGeral, isManager, isSetorManager } from './authStore'
 import type { ProfileRow } from '../types/database'
 
 function makeProfile(overrides: Partial<ProfileRow>): ProfileRow {
@@ -22,10 +22,21 @@ function makeProfile(overrides: Partial<ProfileRow>): ProfileRow {
 // de ação que a RLS ia recusar de qualquer forma, mas que não devia nem
 // aparecer).
 describe('isFullAdmin', () => {
-  it('true só para role administrador', () => {
-    expect(isFullAdmin(makeProfile({ role: 'administrador' }))).toBe(true)
+  it('true para Administrador e Gestor Geral (acesso de administração)', () => {
+    expect(isFullAdmin(makeProfile({ role: 'administrador', setor: null }))).toBe(true)
+    expect(isFullAdmin(makeProfile({ role: 'gestor_geral', setor: null }))).toBe(true)
     expect(isFullAdmin(makeProfile({ role: 'gestor_bar' }))).toBe(false)
     expect(isFullAdmin(null)).toBe(false)
+  })
+})
+
+describe('isAdministrador / isGestorGeral', () => {
+  it('Administrador é só o Administrador; Gestor Geral é o perfil que pede autorização pra apagar', () => {
+    expect(isAdministrador(makeProfile({ role: 'administrador', setor: null }))).toBe(true)
+    expect(isAdministrador(makeProfile({ role: 'gestor_geral', setor: null }))).toBe(false)
+    expect(isGestorGeral(makeProfile({ role: 'gestor_geral', setor: null }))).toBe(true)
+    expect(isGestorGeral(makeProfile({ role: 'administrador', setor: null }))).toBe(false)
+    expect(isGestorGeral(null)).toBe(false)
   })
 })
 
@@ -40,11 +51,13 @@ describe('isSetorManager', () => {
 })
 
 describe('isManager', () => {
-  it('Administrador gerencia qualquer setor', () => {
-    const admin = makeProfile({ role: 'administrador', setor: null })
-    expect(isManager(admin)).toBe(true)
-    expect(isManager(admin, 'Bar')).toBe(true)
-    expect(isManager(admin, 'Cozinha')).toBe(true)
+  it('Administrador e Gestor Geral gerenciam qualquer setor', () => {
+    for (const role of ['administrador', 'gestor_geral'] as const) {
+      const p = makeProfile({ role, setor: null })
+      expect(isManager(p)).toBe(true)
+      expect(isManager(p, 'Bar')).toBe(true)
+      expect(isManager(p, 'Cozinha')).toBe(true)
+    }
   })
 
   it('Gestor de setor só gerencia o próprio setor', () => {

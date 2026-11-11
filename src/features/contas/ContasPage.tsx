@@ -1,12 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabaseClient'
+import { isGestorGeral, useAuthStore } from '../../store/authStore'
 import { FREELANCERS_KEY, useFreelancers } from '../freelancer/useFreelancers'
 import type { AuditLogRow, ProfileRow, Setor, UserRole } from '../../types/database'
 import { summarizeProfileAudit } from './auditSummary'
 
 const ROLE_OPTIONS: { value: UserRole; label: string; needsSetor: boolean }[] = [
   { value: 'administrador', label: 'Administrador', needsSetor: false },
+  { value: 'gestor_geral', label: 'Gestor Geral', needsSetor: false },
   { value: 'gestor_bar', label: 'Gestor de Bar', needsSetor: true },
   { value: 'gestor_cozinha', label: 'Gestor de Cozinha', needsSetor: true },
   { value: 'gestor_salao', label: 'Gestor de Salão', needsSetor: true },
@@ -19,15 +21,17 @@ const ROLE_LABELS: Record<UserRole, string> = Object.fromEntries(ROLE_OPTIONS.ma
   UserRole,
   string
 >
+// Perfis de gestão: só o Administrador cria ou altera (senão o Gestor Geral poderia se promover).
+const PERFIS_DE_GESTAO: UserRole[] = ['administrador', 'gestor_geral']
 const SETORES: Setor[] = ['Bar', 'Cozinha', 'Salão']
 
 function needsSetorFor(role: UserRole) {
   return ROLE_OPTIONS.find((r) => r.value === role)?.needsSetor ?? true
 }
 
-// Exclusivo Administrador — a RLS de `profiles` (migration 0001) já barra
-// qualquer outro perfil de ler/escrever conta alheia, mesmo que esta tela
-// fosse acessada diretamente por alguém sem o link no menu.
+// Administrador e Gestor Geral — a RLS de `profiles` barra qualquer outro
+// perfil de ler/escrever conta alheia, e o Gestor Geral não mexe em contas de
+// gestão (migration 0052). Aqui a tela só esconde o que o banco recusaria.
 export function ContasPage() {
   const queryClient = useQueryClient()
   const { data: contas, isLoading } = useQuery({
@@ -39,6 +43,9 @@ export function ContasPage() {
     },
   })
 
+  const meuPerfil = useAuthStore((s) => s.profile)
+  const souGestorGeral = isGestorGeral(meuPerfil)
+  const opcoesPerfil = souGestorGeral ? ROLE_OPTIONS.filter((r) => !PERFIS_DE_GESTAO.includes(r.value)) : ROLE_OPTIONS
   const [showForm, setShowForm] = useState(false)
   const [nome, setNome] = useState('')
   const [username, setUsername] = useState('')
@@ -143,7 +150,7 @@ export function ContasPage() {
                 setFreelancerId('')
               }}
             >
-              {ROLE_OPTIONS.map((r) => (
+              {opcoesPerfil.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
@@ -221,28 +228,33 @@ export function ContasPage() {
               <button className="icon-btn" onClick={() => setHistoryFor(conta)} title="Histórico">
                 🕘
               </button>
-              <button className="icon-btn" onClick={() => setResetting(conta)} title="Redefinir senha">
-                🔑
-              </button>
-              <button className="icon-btn" onClick={() => setEditing(conta)} title="Editar">
-                ✎
-              </button>
-              <button className="icon-btn" onClick={() => toggleStatus(conta)} title={conta.status === 'ativa' ? 'Bloquear' : 'Ativar'}>
-                {conta.status === 'ativa' ? '⏻' : '✓'}
-              </button>
+              {/* Contas de gestão só o Administrador altera (o banco recusa as do Gestor Geral). */}
+              {!(souGestorGeral && PERFIS_DE_GESTAO.includes(conta.role)) && (
+                <>
+                  <button className="icon-btn" onClick={() => setResetting(conta)} title="Redefinir senha">
+                    🔑
+                  </button>
+                  <button className="icon-btn" onClick={() => setEditing(conta)} title="Editar">
+                    ✎
+                  </button>
+                  <button className="icon-btn" onClick={() => toggleStatus(conta)} title={conta.status === 'ativa' ? 'Bloquear' : 'Ativar'}>
+                    {conta.status === 'ativa' ? '⏻' : '✓'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ))}
       </div>
 
-      {editing && <EditAccountModal conta={editing} onClose={() => setEditing(null)} />}
+      {editing && <EditAccountModal conta={editing} opcoes={opcoesPerfil} onClose={() => setEditing(null)} />}
       {resetting && <ResetPasswordModal conta={resetting} onClose={() => setResetting(null)} />}
       {historyFor && <AccountHistoryModal conta={historyFor} onClose={() => setHistoryFor(null)} />}
     </div>
   )
 }
 
-function EditAccountModal({ conta, onClose }: { conta: ProfileRow; onClose: () => void }) {
+function EditAccountModal({ conta, opcoes, onClose }: { conta: ProfileRow; opcoes: typeof ROLE_OPTIONS; onClose: () => void }) {
   const queryClient = useQueryClient()
   const [nome, setNome] = useState(conta.nome)
   const [role, setRole] = useState<UserRole>(conta.role)
@@ -318,7 +330,7 @@ function EditAccountModal({ conta, onClose }: { conta: ProfileRow; onClose: () =
           <div className="field">
             <label>Perfil *</label>
             <select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
-              {ROLE_OPTIONS.map((r) => (
+              {opcoes.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>

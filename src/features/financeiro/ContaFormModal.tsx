@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { isoDate } from '../../lib/date'
+import { ehMercadoria } from './cmvHelpers'
 import { CONTA_CATEGORIAS } from './financeiroConstants'
 import { contaFormError, formatBRL, parseValorBR } from './contaHelpers'
 import { atualizarConta, criarContas } from './useContasPagar'
@@ -19,6 +20,7 @@ export function ContaFormModal({
   const [categoria, setCategoria] = useState(conta?.categoria ?? 'Outros')
   const [valorTexto, setValorTexto] = useState(conta ? conta.valor.toFixed(2).replace('.', ',') : '')
   const [vencimento, setVencimento] = useState(conta?.vencimento ?? isoDate(new Date()))
+  const [dataCompra, setDataCompra] = useState(conta?.data_compra ?? '')
   const [repete, setRepete] = useState(false)
   const [repeticoes, setRepeticoes] = useState('12')
   const [observacoes, setObservacoes] = useState(conta?.observacoes ?? '')
@@ -45,6 +47,8 @@ export function ContaFormModal({
       valor,
       vencimento,
       observacoes: observacoes.trim() || null,
+      // Só faz sentido pra mercadoria; trocar de categoria limpa a data.
+      data_compra: ehMercadoria(categoria) && dataCompra ? dataCompra : null,
     }
     setSubmitting(true)
     try {
@@ -111,6 +115,16 @@ export function ContaFormModal({
               <input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} required />
             </div>
           </div>
+
+          {ehMercadoria(categoria) && (
+            <div className="field">
+              <label>Data da compra</label>
+              <input type="date" value={dataCompra} onChange={(e) => setDataCompra(e.target.value)} style={{ maxWidth: 200 }} />
+              <span className="field-hint">
+                Em que dia a mercadoria foi comprada (conta pro CMV do período). Em branco, vale o vencimento.
+              </span>
+            </div>
+          )}
 
           {!conta && (
             <div className="field">

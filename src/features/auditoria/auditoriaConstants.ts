@@ -14,6 +14,9 @@ export const AUDIT_TABLE_LABELS: Record<string, string> = {
   cardapios: 'Cardápio RAF',
   requisicoes: 'Requisições',
   contas_pagar: 'Financeiro — Contas a pagar',
+  faturamento_diario: 'Financeiro — Faturamento',
+  estoque_custos: 'Financeiro — Custos do estoque',
+  solicitacoes_exclusao: 'Autorizações — Pedidos de exclusão',
 }
 
 export const AUDIT_TABLES = Object.keys(AUDIT_TABLE_LABELS)

@@ -16,6 +16,7 @@
 
 export type UserRole =
   | 'administrador'
+  | 'gestor_geral'
   | 'gestor_bar'
   | 'gestor_cozinha'
   | 'gestor_salao'
@@ -588,7 +589,27 @@ export type NotaMapeamentoRow = {
   fornecedor_chave: string
   descricao_norm: string
   estoque_item_id: string
+  // Unidades do estoque por 1 unidade da nota (1 CX = 12 UN → 12).
+  fator: number
   updated_at: string
+}
+
+export type SolicitacaoExclusaoStatus = 'pendente' | 'aprovada' | 'recusada'
+
+export type SolicitacaoExclusaoRow = {
+  id: string
+  tabela: string
+  registro_id: string
+  descricao: string
+  dados: Record<string, unknown>
+  solicitante_id: string | null
+  solicitante_nome: string
+  status: SolicitacaoExclusaoStatus
+  resolvido_por: string | null
+  resolvido_por_nome: string | null
+  resolvido_em: string | null
+  resposta: string | null
+  created_at: string
 }
 
 export type ContaPagarRow = {
@@ -610,8 +631,28 @@ export type ContaPagarRow = {
   pago_em: string | null
   valor_pago: number | null
   forma_pagamento: string | null
+  // Data da compra (competência do CMV); vazia = vale o vencimento.
+  data_compra: string | null
   criado_por: string | null
   created_at: string
+  updated_at: string
+}
+
+// CMV (migration 0050). Custo em R$ por unidade do estoque; só o Administrador lê.
+export type EstoqueCustoRow = {
+  id: string
+  item_id: string
+  custo_unitario: number
+  origem: 'manual' | 'nota'
+  updated_at: string
+}
+
+export type FaturamentoDiaRow = {
+  id: string
+  data: string
+  valor: number
+  observacoes: string | null
+  atualizado_por: string | null
   updated_at: string
 }
 
@@ -781,6 +822,9 @@ export type Database = {
       requisicoes: TableDef<RequisicaoRow>
       contas_pagar: TableDef<ContaPagarRow>
       nota_mapeamentos: TableDef<NotaMapeamentoRow>
+      solicitacoes_exclusao: TableDef<SolicitacaoExclusaoRow>
+      estoque_custos: TableDef<EstoqueCustoRow>
+      faturamento_diario: TableDef<FaturamentoDiaRow>
       sobre_nos_secoes: TableDef<SobreNosSecaoRow>
     }
     Views: {
@@ -790,6 +834,10 @@ export type Database = {
     Functions: {
       email_for_username: { Args: { p_username: string }; Returns: string }
       resolve_justificativa_atraso: { Args: { p_conclusao_id: string }; Returns: undefined }
+      resolver_exclusao: {
+        Args: { p_id: string; p_aprovar: boolean; p_resposta?: string | null }
+        Returns: Record<string, unknown>
+      }
       registrar_entrada_estoque: {
         Args: {
           p_item_id: string
@@ -818,6 +866,10 @@ export type Database = {
       registrar_ajuste_estoque: {
         Args: { p_item_id: string; p_nova_quantidade: number; p_observacao?: string | null }
         Returns: EstoqueMovimentoRow
+      }
+      estoque_saldos_em: {
+        Args: { p_momento: string }
+        Returns: { item_id: string; quantidade: number }[]
       }
       registrar_nota_compra: {
         Args: { p_conta: Record<string, unknown>; p_itens: Record<string, unknown>[]; p_fornecedor_chave: string }

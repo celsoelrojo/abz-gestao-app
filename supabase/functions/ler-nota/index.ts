@@ -148,8 +148,8 @@ Deno.serve(async (req) => {
   if (userError || !userData.user) return json({ error: 'Não autenticado' }, 401)
 
   const { data: callerProfile } = await callerClient.from('profiles').select('role').eq('id', userData.user.id).single()
-  if (callerProfile?.role !== 'administrador') {
-    return json({ error: 'Apenas o Administrador pode ler notas fiscais' }, 403)
+  if (callerProfile?.role !== 'administrador' && callerProfile?.role !== 'gestor_geral') {
+    return json({ error: 'Apenas o Administrador ou o Gestor Geral pode ler notas fiscais' }, 403)
   }
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')

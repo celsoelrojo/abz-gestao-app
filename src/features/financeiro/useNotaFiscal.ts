@@ -73,6 +73,8 @@ export interface LancamentoNota {
   categoria: string
   valor: number
   vencimento: string
+  // Data da compra (emissão da nota): é a competência do CMV.
+  dataCompra: string
   observacoes: string
   numeroNota: string
   chaveAcesso: string
@@ -87,10 +89,14 @@ export interface LancamentoItem {
   quantidade: number
   darEntrada: boolean
   descricaoNorm: string
+  // R$ da linha na nota: com a quantidade lançada no estoque dá o custo unitário.
+  valorTotal: number
+  // Unidades do estoque por 1 da nota: lembrado pro vínculo da próxima vez.
+  fator: number
 }
 
-// Tudo numa transação no banco (função registrar_nota_compra, migration 0049):
-// conta a pagar + entrada de estoque + aprendizado. Se algo falhar, nada fica
+// Tudo numa transação no banco (função registrar_nota_compra, migrations 0049 e
+// 0050): conta a pagar + entrada de estoque + custo do produto + aprendizado. Se algo falhar, nada fica
 // pela metade.
 export async function lancarNota(l: LancamentoNota, itens: LancamentoItem[], fornecedorChave: string): Promise<string> {
   const { data, error } = await supabase.rpc('registrar_nota_compra', {
@@ -101,6 +107,7 @@ export async function lancarNota(l: LancamentoNota, itens: LancamentoItem[], for
       categoria: l.categoria,
       valor: l.valor,
       vencimento: l.vencimento,
+      data_compra: l.dataCompra,
       observacoes: l.observacoes.trim(),
       numero_nota: l.numeroNota.trim(),
       chave_acesso: l.chaveAcesso,
@@ -115,6 +122,8 @@ export async function lancarNota(l: LancamentoNota, itens: LancamentoItem[], for
       quantidade: i.quantidade,
       dar_entrada: i.darEntrada,
       descricao_norm: i.descricaoNorm,
+      valor_total: i.valorTotal,
+      fator: i.fator,
     })),
     p_fornecedor_chave: fornecedorChave,
   })

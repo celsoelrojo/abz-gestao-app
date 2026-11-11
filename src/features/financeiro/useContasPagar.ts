@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
+import { isGestorGeral, useAuthStore } from '../../store/authStore'
 import { gerarVencimentos } from './contaHelpers'
 import { removerNotaFoto } from './useNotaFiscal'
 import type { ContaPagarRow } from '../../types/database'
@@ -41,6 +42,8 @@ export interface ContaInput {
   valor: number
   vencimento: string
   observacoes: string | null
+  // Data da compra (CMV); null = vale o vencimento.
+  data_compra: string | null
 }
 
 // `repeticoes` > 1 = a mesma conta todo mês: uma linha por mês, ligadas por
@@ -96,6 +99,8 @@ export async function desfazerPagamento(id: string): Promise<void> {
 export async function excluirConta(conta: Pick<ContaPagarRow, 'id' | 'nota_foto_path'>): Promise<void> {
   const { data, error } = await supabase.from('contas_pagar').delete().eq('id', conta.id).select('id')
   if (error) throw error
+  // Gestor Geral: o banco não apaga e abre um pedido de autorização (0 linhas, sem erro) — o aviso chega por realtime.
+  if (isGestorGeral(useAuthStore.getState().profile)) return
   if (!data || data.length === 0) throw new Error('Conta não encontrada ou sem permissão para excluir.')
   // A foto da nota só serve a esta conta; sem ela o arquivo ficaria órfão no bucket.
   if (conta.nota_foto_path) await removerNotaFoto(conta.nota_foto_path)

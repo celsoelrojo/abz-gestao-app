@@ -1,18 +1,19 @@
 import { resolverConfirmacao, useConfirmStore } from '../store/confirmStore'
 
 // Um único modal, montado uma vez em App.tsx — qualquer tela chama
-// confirmar('mensagem') e recebe true/false quando o usuário decide. Ver
-// confirmStore.ts pro motivo de existir (window.confirm não é confiável
-// neste app).
+// confirmar('mensagem') e recebe true/false quando o usuário decide (ou
+// avisar('mensagem') pra um aviso só com "OK"). Ver confirmStore.ts pro
+// motivo de existir (window.confirm não é confiável neste app).
 export function ConfirmModal() {
   const message = useConfirmStore((s) => s.message)
+  const somenteAviso = useConfirmStore((s) => s.somenteAviso)
   if (!message) return null
 
   return (
     <div className="modal-overlay" onClick={() => resolverConfirmacao(false)}>
       <div id="confirm-modal" className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Confirmar</h3>
+          <h3>{somenteAviso ? 'Aviso' : 'Confirmar'}</h3>
           <button className="modal-close" onClick={() => resolverConfirmacao(false)}>
             ✕
           </button>
@@ -21,11 +22,13 @@ export function ConfirmModal() {
           <p className="confirm-message">{message}</p>
         </div>
         <div className="modal-footer">
-          <button className="btn btn-ghost" onClick={() => resolverConfirmacao(false)}>
-            Cancelar
-          </button>
+          {!somenteAviso && (
+            <button className="btn btn-ghost" onClick={() => resolverConfirmacao(false)}>
+              Cancelar
+            </button>
+          )}
           <button className="btn btn-primary" onClick={() => resolverConfirmacao(true)}>
-            Confirmar
+            {somenteAviso ? 'OK' : 'Confirmar'}
           </button>
         </div>
       </div>

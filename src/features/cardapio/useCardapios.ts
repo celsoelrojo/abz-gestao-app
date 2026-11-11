@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
+import { isGestorGeral, useAuthStore } from '../../store/authStore'
 import type { CardapioDia, CardapioRow } from '../../types/database'
 
 export const CARDAPIOS_KEY = ['cardapios']
@@ -69,5 +70,7 @@ export async function atualizarCardapio(id: string, input: CardapioInput): Promi
 export async function excluirCardapio(id: string): Promise<void> {
   const { data, error } = await supabase.from('cardapios').delete().eq('id', id).select('id')
   if (error) throw error
+  // Gestor Geral: o banco não apaga e abre um pedido de autorização (0 linhas, sem erro) — o aviso chega por realtime.
+  if (isGestorGeral(useAuthStore.getState().profile)) return
   if (!data || data.length === 0) throw new Error('Sem permissão para excluir este cardápio.')
 }

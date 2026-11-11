@@ -27,8 +27,20 @@ export const useAuthStore = create<AuthState>((set) => ({
 // isManager(setor) do protótipo (script.js), só que lendo do profile real.
 // Servem só pra UI (mostrar/esconder); a permissão de verdade é sempre a RLS
 // no banco — nunca confiar só nestas funções.
+// "Acesso de administração": Administrador e Gestor Geral (igual ao is_admin()
+// do banco). O que só o Administrador faz — decidir pedidos de exclusão,
+// contas de gestão — usa isAdministrador.
 export function isFullAdmin(profile: ProfileRow | null): boolean {
+  return profile?.role === 'administrador' || profile?.role === 'gestor_geral'
+}
+
+export function isAdministrador(profile: ProfileRow | null): boolean {
   return profile?.role === 'administrador'
+}
+
+// Tudo do Administrador, menos apagar: a exclusão vira um pedido de autorização.
+export function isGestorGeral(profile: ProfileRow | null): boolean {
+  return profile?.role === 'gestor_geral'
 }
 
 const SETOR_MANAGER_ROLES = new Set(['gestor_bar', 'gestor_cozinha', 'gestor_salao'])

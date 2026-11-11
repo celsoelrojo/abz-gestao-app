@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { reduzirImagem } from '../../lib/imagem'
 import { supabase } from '../../lib/supabaseClient'
+import { isGestorGeral, useAuthStore } from '../../store/authStore'
 import type { RequisicaoRow, RequisicaoStatus, RequisicaoTipo, RequisicaoUrgencia } from '../../types/database'
 
 export const REQUISICOES_KEY = ['requisicoes']
@@ -90,6 +91,8 @@ export async function decidirRequisicao(id: string, status: RequisicaoStatus, mo
 export async function excluirRequisicao(r: RequisicaoRow): Promise<void> {
   const { data, error } = await supabase.from('requisicoes').delete().eq('id', r.id).select('id')
   if (error) throw error
+  // Gestor Geral: o banco não apaga e abre um pedido de autorização (0 linhas, sem erro) — o aviso chega por realtime.
+  if (isGestorGeral(useAuthStore.getState().profile)) return
   if (!data || data.length === 0) throw new Error('Sem permissão para excluir esta requisição.')
   // A foto fica órfã no bucket se não sair junto; falhar aqui não desfaz a
   // exclusão (a requisição já foi), então o erro é ignorado.

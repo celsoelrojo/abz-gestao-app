@@ -31,6 +31,7 @@ function conta(p: Partial<ContaPagarRow>): ContaPagarRow {
     pago_em: null,
     valor_pago: null,
     forma_pagamento: null,
+    data_compra: null,
     criado_por: null,
     created_at: '2026-10-01T10:00:00Z',
     updated_at: '2026-10-01T10:00:00Z',

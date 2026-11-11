@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { isFreelancer, useAuthStore } from './store/authStore'
+import { isFreelancer, isFullAdmin, useAuthStore } from './store/authStore'
 import { useSessionSync } from './features/auth/useSession'
 import { LoginPage } from './features/auth/LoginPage'
 import { ConfirmModal } from './components/ConfirmModal'
@@ -15,10 +15,13 @@ import { FichasProducaoPage } from './features/fichas/FichasProducaoPage'
 import { CardapioPage } from './features/cardapio/CardapioPage'
 import { RequisicoesPage } from './features/requisicoes/RequisicoesPage'
 import { FinanceiroPage } from './features/financeiro/FinanceiroPage'
+import { CmvPage } from './features/financeiro/CmvPage'
 import { MapasPage } from './features/mapas/MapasPage'
 import { FreelancerPage } from './features/freelancer/FreelancerPage'
 import { PopsPage } from './features/pops/PopsPage'
 import { AuditoriaPage } from './features/auditoria/AuditoriaPage'
+import { AutorizacoesPage } from './features/autorizacoes/AutorizacoesPage'
+import { useSolicitacoesRealtime } from './features/autorizacoes/useSolicitacoes'
 import { SobreNosPage } from './features/sobrenos/SobreNosPage'
 import { HomePage } from './features/home/HomePage'
 
@@ -33,9 +36,10 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   useSessionSync()
+  useSolicitacoesRealtime()
   const session = useAuthStore((s) => s.session)
   const profile = useAuthStore((s) => s.profile)
-  const isAdmin = profile?.role === 'administrador'
+  const isAdmin = isFullAdmin(profile)
   // Perfil freelancer é restrito por padrão a Checklist + Sobre nós (Home
   // dedicada, ver FreelancerHomePage) — pedido do usuário foi "nada de
   // Estoque, Fichas, Mapas...". As rotas abaixo cobrem a navegação direta
@@ -158,6 +162,14 @@ export default function App() {
         }
       />
       <Route
+        path="/financeiro/cmv"
+        element={
+          <ProtectedRoute>
+            <Shell>{isAdmin ? <CmvPage /> : <Navigate to="/" replace />}</Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/freelancer"
         element={
           <ProtectedRoute>
@@ -170,6 +182,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shell>{!freelancer ? <PopsPage /> : <Navigate to="/" replace />}</Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/autorizacoes"
+        element={
+          <ProtectedRoute>
+            <Shell>{isAdmin ? <AutorizacoesPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />

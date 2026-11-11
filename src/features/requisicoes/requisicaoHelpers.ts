@@ -1,3 +1,4 @@
+import { isFullAdmin } from '../../store/authStore'
 import type { ProfileRow, RequisicaoRow, RequisicaoStatus, RequisicaoUrgencia } from '../../types/database'
 
 // "Abertas" = ainda pedem ação (esperando decisão ou já aprovadas, a fazer);
@@ -36,6 +37,6 @@ export function requisicaoFormError(input: { titulo: string }): string | null {
 // verdade é o banco — isto só decide o que mostrar.
 export function podeEditarRequisicao(profile: ProfileRow | null, r: RequisicaoRow): boolean {
   if (!profile) return false
-  if (profile.role === 'administrador') return true
+  if (isFullAdmin(profile)) return true
   return r.solicitante_id === profile.id && r.status === 'pendente'
 }

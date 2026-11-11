@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
-import { isFreelancer, isManager, useAuthStore } from '../../store/authStore'
+import { isAdministrador, isFreelancer, isFullAdmin, isManager, useAuthStore } from '../../store/authStore'
 import { Icon, type IconName } from '../../components/Icon'
 import { useChecklistRealtime } from '../checklist/useChecklistTasks'
 import { FreelancerHomePage } from '../freelancer/FreelancerHomePage'
 import { MensagensImportantesPanel } from '../mensagens/MensagensImportantesPanel'
+import { useSolicitacoes } from '../autorizacoes/useSolicitacoes'
 import { TarefasProgressoCard } from './TarefasProgressoCard'
 import { useChecklistResumoDia } from './useChecklistResumoDia'
 
@@ -48,6 +49,7 @@ const MIGRATED_MODULES: { key: string; to: string; title: string; desc: string; 
   { key: 'freelancer', to: '/freelancer', title: 'Freelancer', desc: 'Cadastro e escala de freelancers', icon: 'freelancer', roles: 'admin' },
   { key: 'contas', to: '/contas', title: 'Gerenciar Contas', desc: 'Usuários e acessos', icon: 'accounts', roles: 'admin' },
   { key: 'impressao', to: '/impressao', title: 'Configuração de Impressora', desc: 'Etiquetas de produção', icon: 'gear', roles: 'manager' },
+  { key: 'autorizacoes', to: '/autorizacoes', title: 'Autorizações', desc: 'Pedidos para apagar registros', icon: 'autorizacoes', roles: 'admin' },
   { key: 'auditoria', to: '/auditoria', title: 'Histórico de Auditoria', desc: 'Quem alterou o quê e quando', icon: 'auditoria', roles: 'admin' },
   { key: 'sobre-nos', to: '/sobre-nos', title: 'Sobre nós', desc: 'História, cultura e cargos', icon: 'sobre-nos', roles: 'todos' },
 ]
@@ -56,13 +58,15 @@ const PENDING_MODULES: string[] = []
 
 export function HomePage() {
   const profile = useAuthStore((s) => s.profile)
-  const isAdmin = profile?.role === 'administrador'
+  const isAdmin = isFullAdmin(profile)
   const managerAccess = isManager(profile)
   const salaoAccess = isAdmin || profile?.setor === 'Salão'
   const barCozinhaAccess = isAdmin || profile?.setor === 'Bar' || profile?.setor === 'Cozinha'
   const cozinhaAccess = isAdmin || profile?.setor === 'Cozinha'
 
   useChecklistRealtime()
+  const { data: pedidosExclusao } = useSolicitacoes(isAdministrador(profile))
+  const aguardando = (pedidosExclusao ?? []).filter((p) => p.status === 'pendente').length
   const { data: resumoDia } = useChecklistResumoDia()
 
   // Perfil freelancer tem uma Home própria (só a própria escala + Checklist
@@ -72,6 +76,17 @@ export function HomePage() {
   return (
     <div className="container">
       <MensagensImportantesPanel />
+
+      {isAdministrador(profile) && aguardando > 0 && (
+        <Link to="/autorizacoes" className="pop-alert-box" style={{ marginBottom: 18, textDecoration: 'none', color: 'inherit' }}>
+          <Icon name="autorizacoes" className="inline-icon" />
+          <span>
+            <strong>
+              {aguardando} {aguardando === 1 ? 'pedido' : 'pedidos'} de exclusão {aguardando === 1 ? 'aguarda' : 'aguardam'} sua decisão
+            </strong>
+          </span>
+        </Link>
+      )}
 
       {resumoDia && (
         <div className="home-progress-row">

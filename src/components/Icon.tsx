@@ -46,6 +46,7 @@ const OVERRIDES: Partial<Record<string, { strokeWidth?: number; scale?: number }
   accounts: { scale: 1.7 },
   gear: { scale: 1.7 },
   auditoria: { scale: 1.7 },
+  autorizacoes: { scale: 1.7 },
   'sobre-nos': { scale: 1.7 },
 }
 
@@ -248,6 +249,21 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M18.7 17.2 21.5 20" />
     </>
   ),
+  // CMV: faturamento = colunas com seta subindo; custos do estoque = etiqueta de preço.
+  'financeiro-faturamento': (
+    <>
+      <path d="M4 20h16" />
+      <path d="M7 20v-5M12 20v-8M17 20v-11" />
+      <path d="M5.5 10 10 6l3 2.5L19 4" />
+      <path d="M15.5 4H19v3.5" />
+    </>
+  ),
+  'financeiro-custos': (
+    <>
+      <path d="M3.5 5.2v6.6c0 .4.2.8.5 1.1l7.6 7.6a1.6 1.6 0 0 0 2.2 0l5.9-5.9a1.6 1.6 0 0 0 0-2.2L12.1 4.2a1.6 1.6 0 0 0-1.1-.5H5A1.5 1.5 0 0 0 3.5 5.2Z" />
+      <circle cx="8" cy="8.5" r="1.3" />
+    </>
+  ),
   'financeiro-abertas': (
     <>
       <circle cx="12" cy="12" r="8.5" />
@@ -406,6 +422,13 @@ const PATHS: Record<string, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8.2" />
       <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  // Autorizações: escudo com visto (pedido de exclusão aprovado pelo Administrador).
+  autorizacoes: (
+    <>
+      <path d="M12 3.2 5 6v5.5c0 4.2 2.8 7.5 7 9.3 4.2-1.8 7-5.1 7-9.3V6l-7-2.8Z" />
+      <path d="m8.8 12 2.4 2.4 4-4.6" />
     </>
   ),
   // "Sobre nós": livro aberto (história/cultura/manual do time), duas

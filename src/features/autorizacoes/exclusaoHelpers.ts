@@ -17,6 +17,7 @@ const TABELA_LABELS: Record<string, string> = {
   pops: "POP",
   requisicoes: 'Requisição',
   fichas_tecnicas: 'Ficha Técnica',
+  notificacao_destinos: 'Destino de notificação',
 }
 
 export function rotuloTabela(tabela: string): string {

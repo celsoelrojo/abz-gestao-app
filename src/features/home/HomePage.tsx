@@ -49,6 +49,7 @@ const MIGRATED_MODULES: { key: string; to: string; title: string; desc: string; 
   { key: 'freelancer', to: '/freelancer', title: 'Freelancer', desc: 'Cadastro e escala de freelancers', icon: 'freelancer', roles: 'admin' },
   { key: 'contas', to: '/contas', title: 'Gerenciar Contas', desc: 'Usuários e acessos', icon: 'accounts', roles: 'admin' },
   { key: 'impressao', to: '/impressao', title: 'Configuração de Impressora', desc: 'Etiquetas de produção', icon: 'gear', roles: 'manager' },
+  { key: 'notificacoes', to: '/notificacoes', title: 'Notificações', desc: 'Avisos do Checklist no Telegram', icon: 'notificacoes', roles: 'admin' },
   { key: 'autorizacoes', to: '/autorizacoes', title: 'Autorizações', desc: 'Pedidos para apagar registros', icon: 'autorizacoes', roles: 'admin' },
   { key: 'auditoria', to: '/auditoria', title: 'Histórico de Auditoria', desc: 'Quem alterou o quê e quando', icon: 'auditoria', roles: 'admin' },
   { key: 'sobre-nos', to: '/sobre-nos', title: 'Sobre nós', desc: 'História, cultura e cargos', icon: 'sobre-nos', roles: 'todos' },

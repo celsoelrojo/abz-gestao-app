@@ -412,3 +412,11 @@ enabled = true
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Chamadas que não vêm de um usuário logado (banco via pg_net e o Telegram):
+# a autenticação é feita dentro da função, com o segredo NOTIFY_SECRET.
+[functions.notificar-telegram]
+verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false

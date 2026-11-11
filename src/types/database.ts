@@ -594,6 +594,21 @@ export type NotaMapeamentoRow = {
   updated_at: string
 }
 
+export type NotificacaoDestinoRow = {
+  id: string
+  nome: string
+  setor: Setor | null
+  chat_id: number | null
+  chat_nome: string | null
+  avisar_conclusoes: boolean
+  avisar_pendencias: boolean
+  ativo: boolean
+  codigo_ativacao: string | null
+  codigo_expira_em: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type SolicitacaoExclusaoStatus = 'pendente' | 'aprovada' | 'recusada'
 
 export type SolicitacaoExclusaoRow = {
@@ -823,6 +838,7 @@ export type Database = {
       contas_pagar: TableDef<ContaPagarRow>
       nota_mapeamentos: TableDef<NotaMapeamentoRow>
       solicitacoes_exclusao: TableDef<SolicitacaoExclusaoRow>
+      notificacao_destinos: TableDef<NotificacaoDestinoRow>
       estoque_custos: TableDef<EstoqueCustoRow>
       faturamento_diario: TableDef<FaturamentoDiaRow>
       sobre_nos_secoes: TableDef<SobreNosSecaoRow>

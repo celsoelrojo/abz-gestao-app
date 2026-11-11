@@ -47,6 +47,7 @@ const OVERRIDES: Partial<Record<string, { strokeWidth?: number; scale?: number }
   gear: { scale: 1.7 },
   auditoria: { scale: 1.7 },
   autorizacoes: { scale: 1.7 },
+  notificacoes: { scale: 1.7 },
   'sobre-nos': { scale: 1.7 },
 }
 
@@ -422,6 +423,13 @@ const PATHS: Record<string, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8.2" />
       <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  // Notificações: sino.
+  notificacoes: (
+    <>
+      <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15L6 16.5Z" />
+      <path d="M10 20.2a2.2 2.2 0 0 0 4 0" />
     </>
   ),
   // Autorizações: escudo com visto (pedido de exclusão aprovado pelo Administrador).

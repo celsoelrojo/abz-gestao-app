@@ -21,6 +21,7 @@ import { FreelancerPage } from './features/freelancer/FreelancerPage'
 import { PopsPage } from './features/pops/PopsPage'
 import { AuditoriaPage } from './features/auditoria/AuditoriaPage'
 import { AutorizacoesPage } from './features/autorizacoes/AutorizacoesPage'
+import { NotificacoesPage } from './features/notificacoes/NotificacoesPage'
 import { useSolicitacoesRealtime } from './features/autorizacoes/useSolicitacoes'
 import { SobreNosPage } from './features/sobrenos/SobreNosPage'
 import { HomePage } from './features/home/HomePage'
@@ -182,6 +183,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Shell>{!freelancer ? <PopsPage /> : <Navigate to="/" replace />}</Shell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notificacoes"
+        element={
+          <ProtectedRoute>
+            <Shell>{isAdmin ? <NotificacoesPage /> : <Navigate to="/" replace />}</Shell>
           </ProtectedRoute>
         }
       />

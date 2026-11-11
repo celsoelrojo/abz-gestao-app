@@ -17,6 +17,7 @@ export const AUDIT_TABLE_LABELS: Record<string, string> = {
   faturamento_diario: 'Financeiro — Faturamento',
   estoque_custos: 'Financeiro — Custos do estoque',
   solicitacoes_exclusao: 'Autorizações — Pedidos de exclusão',
+  notificacao_destinos: 'Notificações — Destinos do Telegram',
 }
 
 export const AUDIT_TABLES = Object.keys(AUDIT_TABLE_LABELS)

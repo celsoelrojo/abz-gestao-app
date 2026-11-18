@@ -68,11 +68,16 @@ export const momentoFinal = (p: Periodo) => virada(somarDias(p.fim, 1))
 
 export type ItemEstoqueCmv = Pick<EstoqueItemRow, 'id' | 'title' | 'unidade' | 'categoria' | 'tipo_produto'>
 
-// Material de limpeza e "Outros" não são mercadoria; Remanufaturado (xaropes,
-// preparos) é feito de insumos que já estão no estoque — contar os dois seria
-// contar o mesmo custo duas vezes.
+// Material de limpeza, "Outros" e Consumível (descartáveis) não são mercadoria
+// vendida; Remanufaturado (xaropes, preparos) é feito de insumos que já estão
+// no estoque — contar os dois seria contar o mesmo custo duas vezes.
 export function itemContaNoCmv(item: Pick<EstoqueItemRow, 'categoria' | 'tipo_produto'>): boolean {
-  return item.tipo_produto !== 'Remanufaturado' && item.categoria !== 'Material de Limpeza' && item.categoria !== 'Outros'
+  return (
+    item.tipo_produto !== 'Remanufaturado' &&
+    item.tipo_produto !== 'Consumível' &&
+    item.categoria !== 'Material de Limpeza' &&
+    item.categoria !== 'Outros'
+  )
 }
 
 export interface LinhaEstoque {

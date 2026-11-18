@@ -448,7 +448,7 @@ export type EstoqueMovimentoTipo =
   | 'Estorno de Retirada'
   | 'Ajuste de Estoque'
   | 'Entrada por Recebimento'
-export type EstoqueTipoProduto = 'Matéria Prima' | 'Remanufaturado' | 'Pronto para Venda'
+export type EstoqueTipoProduto = 'Matéria Prima' | 'Remanufaturado' | 'Pronto para Venda' | 'Consumível'
 export type EstoqueCondicaoArmazenamento = 'Ambiente' | 'Refrigerado' | 'Congelado'
 
 export type EstoqueItemRow = {
@@ -490,6 +490,46 @@ export type PedidoCompraRow = {
   criado_em: string
   recebido_por: string | null
   recebido_em: string | null
+  cotacao_id: string | null
+}
+
+export type CotacaoStatus = 'aberta' | 'finalizada'
+
+export type CotacaoRow = {
+  id: string
+  titulo: string | null
+  observacoes: string | null
+  status: CotacaoStatus
+  criado_por: string | null
+  criado_em: string
+  atualizado_em: string
+  finalizada_em: string | null
+}
+
+export type CotacaoFornecedorRow = {
+  id: string
+  cotacao_id: string
+  nome: string
+  observacoes: string | null
+  ordem: number
+}
+
+export type CotacaoItemRow = {
+  id: string
+  cotacao_id: string
+  estoque_item_id: string | null
+  produto: string
+  categoria: EstoqueCategoria
+  unidade: EstoqueUnidade
+  quantidade: number
+  ordem: number
+  fornecedor_escolhido_id: string | null
+}
+
+export type CotacaoPrecoRow = {
+  item_id: string
+  fornecedor_id: string
+  preco_unitario: number
 }
 
 export type PedidoCompraItemRow = {
@@ -826,6 +866,10 @@ export type Database = {
       estoque_itens: TableDef<EstoqueItemRow>
       estoque_movimentos: TableDef<EstoqueMovimentoRow>
       pedidos_compra: TableDef<PedidoCompraRow>
+      cotacoes: TableDef<CotacaoRow>
+      cotacao_fornecedores: TableDef<CotacaoFornecedorRow>
+      cotacao_itens: TableDef<CotacaoItemRow>
+      cotacao_precos: TableDef<CotacaoPrecoRow>
       pedidos_compra_itens: TableDef<PedidoCompraItemRow>
       taxonomias: TableDef<TaxonomiaRow>
       mensagens: TableDef<MensagemRow>
@@ -850,6 +894,8 @@ export type Database = {
     Functions: {
       email_for_username: { Args: { p_username: string }; Returns: string }
       resolve_justificativa_atraso: { Args: { p_conclusao_id: string }; Returns: undefined }
+      salvar_cotacao: { Args: { p_id: string | null; p_dados: Record<string, unknown> }; Returns: string }
+      gerar_pedidos_cotacao: { Args: { p_cotacao_id: string; p_data_entrega: string }; Returns: number }
       resolver_exclusao: {
         Args: { p_id: string; p_aprovar: boolean; p_resposta?: string | null }
         Returns: Record<string, unknown>

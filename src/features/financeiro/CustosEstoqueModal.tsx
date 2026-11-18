@@ -53,7 +53,7 @@ export function CustosEstoqueModal({ onClose, onSaved }: { onClose: () => void; 
           <p className="field-hint">
             Custo de <strong>uma unidade do estoque</strong> (um fardo, um litro, um quilo...). Quando você lança uma nota
             com entrada no estoque, o custo é atualizado sozinho com o preço pago. Produto sem custo fica fora do CMV.
-            Remanufaturados (xaropes, preparos) não entram: o custo deles já está nos insumos.
+            Remanufaturados (xaropes, preparos) não entram: o custo deles já está nos insumos. Consumíveis (descartáveis) também ficam fora.
           </p>
           {semCustoComSaldo > 0 && (
             <p className="field-hint" style={{ color: 'var(--gold-bright)' }}>

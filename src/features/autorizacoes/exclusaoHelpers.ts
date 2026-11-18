@@ -18,6 +18,7 @@ const TABELA_LABELS: Record<string, string> = {
   requisicoes: 'Requisição',
   fichas_tecnicas: 'Ficha Técnica',
   notificacao_destinos: 'Destino de notificação',
+  cotacoes: 'Cotação',
 }
 
 export function rotuloTabela(tabela: string): string {

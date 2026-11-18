@@ -80,10 +80,11 @@ describe('períodos', () => {
 })
 
 describe('itemContaNoCmv', () => {
-  it('exclui remanufaturado, material de limpeza e outros', () => {
+  it('exclui remanufaturado, consumível, material de limpeza e outros', () => {
     expect(itemContaNoCmv({ categoria: 'Bar', tipo_produto: 'Matéria Prima' })).toBe(true)
     expect(itemContaNoCmv({ categoria: 'Cozinha', tipo_produto: 'Pronto para Venda' })).toBe(true)
     expect(itemContaNoCmv({ categoria: 'Bar', tipo_produto: 'Remanufaturado' })).toBe(false)
+    expect(itemContaNoCmv({ categoria: 'Bar', tipo_produto: 'Consumível' })).toBe(false)
     expect(itemContaNoCmv({ categoria: 'Material de Limpeza', tipo_produto: 'Matéria Prima' })).toBe(false)
     expect(itemContaNoCmv({ categoria: 'Outros', tipo_produto: 'Matéria Prima' })).toBe(false)
   })

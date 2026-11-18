@@ -9,7 +9,7 @@ import type {
 
 export const ESTOQUE_CATEGORIAS: EstoqueCategoria[] = ['Bar', 'Cozinha', 'Salão', 'Material de Limpeza', 'Outros']
 
-export const ESTOQUE_TIPOS_PRODUTO: EstoqueTipoProduto[] = ['Matéria Prima', 'Remanufaturado', 'Pronto para Venda']
+export const ESTOQUE_TIPOS_PRODUTO: EstoqueTipoProduto[] = ['Matéria Prima', 'Remanufaturado', 'Pronto para Venda', 'Consumível']
 
 export const ESTOQUE_CONDICOES_ARMAZENAMENTO: EstoqueCondicaoArmazenamento[] = ['Ambiente', 'Refrigerado', 'Congelado']
 

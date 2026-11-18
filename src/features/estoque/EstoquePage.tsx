@@ -9,10 +9,11 @@ import { EstoqueEntradaTab } from './EstoqueEntradaTab'
 import { EstoqueRetiradaTab } from './EstoqueRetiradaTab'
 import { EstoqueLimitesTab } from './EstoqueLimitesTab'
 import { EstoqueComprasTab } from './EstoqueComprasTab'
+import { CotacoesTab } from './CotacoesTab'
 import { PedidosCompraTab } from './PedidosCompraTab'
 import { ReceberMercadoriaTab } from './ReceberMercadoriaTab'
 
-type EstoqueTab = 'hub' | 'atual' | 'cadastrar' | 'entrada' | 'retirada' | 'limites' | 'compras' | 'pedidos' | 'receber'
+type EstoqueTab = 'hub' | 'atual' | 'cadastrar' | 'entrada' | 'retirada' | 'limites' | 'compras' | 'cotacoes' | 'pedidos' | 'receber'
 
 const SUBMENU: {
   key: EstoqueTab
@@ -41,6 +42,14 @@ const SUBMENU: {
     adminOnly: true,
   },
   { key: 'compras', title: 'Lista de Compras', desc: 'Sugestão de compra', icon: 'estoque-compras', managerOnly: true },
+  {
+    key: 'cotacoes',
+    title: 'Cotações',
+    desc: 'Comparar preços entre fornecedores',
+    icon: 'estoque-compras',
+    managerOnly: false,
+    adminOnly: true,
+  },
   {
     key: 'cadastrar',
     title: 'Cadastrar Produto',
@@ -105,6 +114,7 @@ export function EstoquePage() {
       {activeTab === 'retirada' && <EstoqueRetiradaTab />}
       {activeTab === 'limites' && <EstoqueLimitesTab />}
       {activeTab === 'compras' && <EstoqueComprasTab />}
+      {activeTab === 'cotacoes' && <CotacoesTab />}
       {activeTab === 'pedidos' && <PedidosCompraTab />}
       {activeTab === 'receber' && <ReceberMercadoriaTab />}
     </div>

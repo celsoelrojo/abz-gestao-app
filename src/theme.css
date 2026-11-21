@@ -1110,3 +1110,18 @@ input, textarea, select { font-family: inherit; }
 .fin-resumo-titulo { font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .fin-resumo-valor { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .fin-resumo-qtd { font-size: 0.76rem; color: var(--text-secondary); }
+
+/* Botões de ação do topo de uma seção (ex.: Cadastrar Produto): mais largos e
+   com a cor de destaque, pra serem o caminho principal da tela. */
+.btn-destaque {
+  padding: 11px 20px;
+  font-size: 0.98rem;
+  font-weight: 600;
+  background: var(--gold-soft);
+  color: var(--gold-bright);
+  border: 1px solid var(--gold-dark);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-destaque:hover { background: var(--gold-dark); color: #fff; }
+.btn-destaque.active { background: linear-gradient(180deg, var(--gold-bright), var(--gold-dark)); color: #fff; border-color: var(--gold-bright); }

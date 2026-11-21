@@ -25,9 +25,6 @@ export function EstoqueLimitesTab() {
 
   return (
     <div>
-      <h3 className="page-title" style={{ marginBottom: 16 }}>
-        Estoque Mínimo e Máximo
-      </h3>
       {gruposSetor.length === 0 && <div className="empty-state">Nenhum produto cadastrado.</div>}
       {gruposSetor.map((grupoSetor) => (
         <div key={grupoSetor.chave} style={{ marginBottom: 28 }}>

@@ -14,6 +14,7 @@ import {
   UNIDADES_VALIDADE,
 } from './estoqueConstants'
 import { EditarProdutoModal } from './EditarProdutoModal'
+import { EstoqueLimitesTab } from './EstoqueLimitesTab'
 import { GerenciarTaxonomiasModal } from './GerenciarTaxonomiasModal'
 import { TaxonomiaField } from './TaxonomiaField'
 import { VolumeProprioFields } from './VolumeProprioFields'
@@ -51,7 +52,7 @@ export function EstoqueCadastrarProdutoTab() {
   // Gestor do setor) — a mesma tela de cadastro também é usada por qualquer
   // funcionário do setor (managerOnly:false no SUBMENU), então essa restrição
   // é só da aba de listagem/edição, não do cadastro de produto novo em si.
-  const [view, setView] = useState<'novo' | 'lista'>('novo')
+  const [view, setView] = useState<'novo' | 'lista' | 'limites'>('novo')
   const [gerenciarTaxonomias, setGerenciarTaxonomias] = useState(false)
 
   const [setor, setSetor] = useState<EstoqueCategoria>((locked as EstoqueCategoria | null) ?? setores[0] ?? 'Bar')
@@ -209,24 +210,36 @@ export function EstoqueCadastrarProdutoTab() {
     <div className="checklist-header" style={{ marginBottom: 16 }}>
       <div>
         <h3 className="page-title" style={{ marginBottom: 4 }}>
-          {view === 'novo' ? 'Cadastrar Produto' : 'Produtos cadastrados'}
+          {view === 'novo' ? 'Cadastrar Produto' : view === 'lista' ? 'Produtos cadastrados' : 'Estoque mínimo e máximo'}
         </h3>
         <p className="page-subtitle">
           {view === 'novo'
             ? 'Cadastro base do produto — usado por Entrada, Retirada, Estoque Mínimo/Máximo e Lista de Compras.'
-            : 'Ver e editar produtos já cadastrados.'}
+            : view === 'lista'
+              ? 'Ver e editar produtos já cadastrados.'
+              : 'Defina o mínimo (alerta), o médio (entra na Lista de Compras) e o máximo de cada produto.'}
         </p>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {isFullAdmin(profile) && (
-          <button type="button" className="btn btn-ghost" onClick={() => setGerenciarTaxonomias(true)}>
+          <button type="button" className="btn-destaque" onClick={() => setGerenciarTaxonomias(true)}>
             Gerenciar categorias
           </button>
         )}
         {canManage && (
-          <button type="button" className="btn btn-ghost" onClick={() => setView(view === 'novo' ? 'lista' : 'novo')}>
-            {view === 'novo' ? 'Ver / editar produtos' : '+ Novo produto'}
-          </button>
+          <>
+            {view !== 'novo' && (
+              <button type="button" className="btn-destaque" onClick={() => setView('novo')}>
+                + Novo produto
+              </button>
+            )}
+            <button type="button" className={`btn-destaque ${view === 'lista' ? 'active' : ''}`} onClick={() => setView('lista')}>
+              Ver / editar produtos
+            </button>
+            <button type="button" className={`btn-destaque ${view === 'limites' ? 'active' : ''}`} onClick={() => setView('limites')}>
+              Estoque mínimo e máximo
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -241,6 +254,16 @@ export function EstoqueCadastrarProdutoTab() {
       <div>
         {header}
         <ProdutosCadastradosLista itens={itens ?? []} setores={setores} podeExcluir={isFullAdmin(profile)} />
+        {taxonomiasModal}
+      </div>
+    )
+  }
+
+  if (view === 'limites') {
+    return (
+      <div>
+        {header}
+        <EstoqueLimitesTab />
         {taxonomiasModal}
       </div>
     )

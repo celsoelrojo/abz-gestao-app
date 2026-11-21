@@ -7,11 +7,10 @@ import { EstoqueAtualTab } from './EstoqueAtualTab'
 import { EstoqueCadastrarProdutoTab } from './EstoqueCadastrarProdutoTab'
 import { EstoqueEntradaTab } from './EstoqueEntradaTab'
 import { EstoqueRetiradaTab } from './EstoqueRetiradaTab'
-import { EstoqueLimitesTab } from './EstoqueLimitesTab'
 import { ComprasModulo } from './ComprasModulo'
 import { ReceberMercadoriaTab } from './ReceberMercadoriaTab'
 
-type EstoqueTab = 'hub' | 'atual' | 'cadastrar' | 'entrada' | 'retirada' | 'limites' | 'compras' | 'receber'
+type EstoqueTab = 'hub' | 'atual' | 'cadastrar' | 'entrada' | 'retirada' | 'compras' | 'receber'
 
 const SUBMENU: {
   key: EstoqueTab
@@ -35,11 +34,10 @@ const SUBMENU: {
   {
     key: 'cadastrar',
     title: 'Cadastrar Produto',
-    desc: 'Base do produto: tipo, marca, categoria, validade',
+    desc: 'Produtos, categorias e estoque mínimo/máximo',
     icon: 'estoque-cadastrar',
     managerOnly: true,
   },
-  { key: 'limites', title: 'Estoque Mínimo e Máximo', desc: 'Configurar limites', icon: 'estoque-limites', managerOnly: true },
 ]
 
 export function EstoquePage() {
@@ -94,7 +92,6 @@ export function EstoquePage() {
         <EstoqueEntradaTab onIrParaCadastro={canManage ? () => setTab('cadastrar') : undefined} />
       )}
       {activeTab === 'retirada' && <EstoqueRetiradaTab />}
-      {activeTab === 'limites' && <EstoqueLimitesTab />}
       {activeTab === 'compras' && <ComprasModulo />}
       {activeTab === 'receber' && <ReceberMercadoriaTab />}
     </div>

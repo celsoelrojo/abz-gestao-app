@@ -81,10 +81,13 @@ export function precisaComprar(item: Pick<EstoqueItemRow, 'medio' | 'quantidade'
 // usuário: o médio só decide QUANDO entra na lista (precisaComprar acima), a
 // quantidade sugerida é sempre calculada em cima do máximo configurado.
 // Sem máximo configurado não há como calcular, então retorna null (a UI
-// decide como lidar com isso). Nunca sugere comprar um número negativo.
+// decide como lidar com isso). Nunca sugere comprar um número negativo e
+// sempre arredonda pra cima (não se compra 2,3 fardos). O arredondamento a 6
+// casas antes do teto evita que 0,8 × 15 = 12,000000000000002 vire 13.
 export function sugestaoCompra(item: Pick<EstoqueItemRow, 'max' | 'quantidade'>): number | null {
   if (item.max == null) return null
-  return Math.max(0, 0.8 * Number(item.max) - Number(item.quantidade))
+  const bruto = Math.round((0.8 * Number(item.max) - Number(item.quantidade)) * 1e6) / 1e6
+  return Math.max(0, Math.ceil(bruto))
 }
 
 export type ValidadeRotulo = 'vencido' | 'vence-hoje' | 'vence-em-dias'

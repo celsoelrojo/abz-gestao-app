@@ -57,6 +57,11 @@ describe('precisaComprar / sugestaoCompra', () => {
   it('sugestaoCompra mira 80% do máximo, não o médio', () => {
     expect(sugestaoCompra({ max: 20, quantidade: 4 })).toBe(12) // 80% de 20 = 16; 16 - 4 = 12
   })
+  it('sugestaoCompra arredonda pra cima, sem inventar +1 por erro de ponto flutuante', () => {
+    expect(sugestaoCompra({ max: 10, quantidade: 2.5 })).toBe(6) // 8 - 2,5 = 5,5 -> 6
+    expect(sugestaoCompra({ max: 15, quantidade: 0 })).toBe(12) // 0,8 × 15 = 12 exato (não 13)
+    expect(sugestaoCompra({ max: 12, quantidade: 0.3 })).toBe(10) // 9,6 - 0,3 = 9,3 -> 10
+  })
   it('sugestaoCompra nunca fica negativa', () => {
     expect(sugestaoCompra({ max: 20, quantidade: 18 })).toBe(0) // 80% de 20 = 16 < 18
   })

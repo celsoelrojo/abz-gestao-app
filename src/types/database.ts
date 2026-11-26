@@ -642,6 +642,7 @@ export type NotificacaoDestinoRow = {
   chat_nome: string | null
   avisar_conclusoes: boolean
   avisar_pendencias: boolean
+  avisar_requisicoes: boolean
   ativo: boolean
   codigo_ativacao: string | null
   codigo_expira_em: string | null

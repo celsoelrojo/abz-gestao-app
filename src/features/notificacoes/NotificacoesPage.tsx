@@ -8,6 +8,7 @@ import {
   ativarBot,
   atualizarDestino,
   criarDestino,
+  enviarRequisicoesAgora,
   enviarResumoAgora,
   enviarTeste,
   excluirDestino,
@@ -21,7 +22,7 @@ const SETORES: Setor[] = ['Bar', 'Cozinha', 'Salão']
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 const mensagemErro = (err: unknown, padrao: string) => (err instanceof Error ? err.message : padrao)
 
-// Avisos do Checklist no Telegram. Administrador e Gestor Geral.
+// Avisos do Checklist e das Requisições no Telegram. Administrador e Gestor Geral.
 export function NotificacoesPage() {
   const queryClient = useQueryClient()
   const { data: destinos, isLoading } = useNotificacaoDestinos()
@@ -76,12 +77,23 @@ export function NotificacoesPage() {
       )
     }, 'Não foi possível enviar o resumo.')
 
+  const requisicoesAgora = () =>
+    executar(async () => {
+      if (!(await confirmar('Enviar agora as requisições em aberto para todos os destinos conectados?'))) return
+      const r = await enviarRequisicoesAgora()
+      window.alert(
+        r.falhas.length
+          ? `Mensagens enviadas: ${r.enviadas}. Falhou em: ${r.falhas.map((f) => `${f.destino} (${f.motivo})`).join('; ')}`
+          : `Mensagens enviadas: ${r.enviadas}.`,
+      )
+    }, 'Não foi possível enviar as requisições.')
+
   return (
     <div className="container">
       <div className="checklist-header">
         <div>
           <h2 className="page-title">Notificações</h2>
-          <p className="page-subtitle">Avisos do Checklist no Telegram: tarefa concluída e, às 5h05, o que ficou pendente no dia anterior.</p>
+          <p className="page-subtitle">Avisos no Telegram: tarefa concluída, nova requisição e, de manhã, as requisições em aberto (5h) e as tarefas pendentes do dia anterior (5h05).</p>
         </div>
       </div>
 
@@ -153,9 +165,14 @@ export function NotificacoesPage() {
       </div>
 
       {(destinos ?? []).some((d) => d.chat_id != null) && (
-        <button type="button" className="btn btn-ghost" style={{ marginTop: 16 }} disabled={ocupado} onClick={resumoAgora}>
-          Enviar agora o resumo de pendências de ontem
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+          <button type="button" className="btn btn-ghost" disabled={ocupado} onClick={resumoAgora}>
+            Enviar agora o resumo de pendências de ontem
+          </button>
+          <button type="button" className="btn btn-ghost" disabled={ocupado} onClick={requisicoesAgora}>
+            Enviar agora as requisições em aberto
+          </button>
+        </div>
       )}
     </div>
   )
@@ -178,7 +195,7 @@ function DestinoCard({ destino: d, onChange, onErro }: { destino: NotificacaoDes
     }
   }
 
-  const alternar = (campo: 'avisar_conclusoes' | 'avisar_pendencias' | 'ativo') =>
+  const alternar = (campo: 'avisar_conclusoes' | 'avisar_pendencias' | 'avisar_requisicoes' | 'ativo') =>
     rodar(() => atualizarDestino(d.id, { [campo]: !d[campo] }), 'Erro ao salvar.')
 
   const excluir = () =>
@@ -216,6 +233,9 @@ function DestinoCard({ destino: d, onChange, onErro }: { destino: NotificacaoDes
           </label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <input type="checkbox" checked={d.avisar_pendencias} disabled={ocupado} onChange={() => alternar('avisar_pendencias')} /> Pendências do dia (5h05)
+          </label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="checkbox" checked={d.avisar_requisicoes} disabled={ocupado} onChange={() => alternar('avisar_requisicoes')} /> Requisições (nova e 5h)
           </label>
         </div>
       )}

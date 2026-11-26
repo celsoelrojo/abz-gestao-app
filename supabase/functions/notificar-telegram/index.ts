@@ -1,12 +1,14 @@
 // Edge Function: notificar-telegram
-// Manda os avisos do Checklist pros grupos/pessoas cadastrados em
+// Manda os avisos do Checklist e das Requisições pros grupos/pessoas cadastrados em
 // notificacao_destinos (tela Notificações). Dois jeitos de chamar:
 //
 //   * Pelo banco (pg_net, migration 0053), com `Authorization: Bearer
 //     <NOTIFY_SECRET>`: { tipo: 'conclusao', conclusao_id } a cada tarefa
-//     concluída, e { tipo: 'pendencias' } às 5h05 (resumo do dia que fechou).
+//     concluída, { tipo: 'requisicao', requisicao_id } a cada requisição aberta,
+//     { tipo: 'requisicoes_abertas' } às 5h (o que ainda não foi feito) e
+//     { tipo: 'pendencias' } às 5h05 (resumo do dia que fechou).
 //   * Pelo app, como Administrador/Gestor Geral logado: { tipo: 'status' |
-//     'configurar' | 'teste' | 'pendencias' }.
+//     'configurar' | 'teste' | 'pendencias' | 'requisicoes_abertas' }.
 //
 // Segredos (supabase secrets set): TELEGRAM_BOT_TOKEN (do @BotFather) e
 // NOTIFY_SECRET (aleatório, também gravado em config_interna pra o banco chamar).
@@ -26,6 +28,7 @@ import {
   dataEmBrasilia,
   type TarefaDoDia,
 } from '../_shared/agenda.ts'
+import { mensagemNovaRequisicao, mensagensRequisicoesAbertas, type RequisicaoAviso } from '../_shared/requisicoes.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -148,7 +151,7 @@ Deno.serve(async (req) => {
   if (doApp && tipo === 'teste') {
     const { data: d } = await admin.from('notificacao_destinos').select('id, nome, chat_id').eq('id', String(body.destino_id ?? '')).single()
     if (!d || d.chat_id == null) return json({ error: 'Este destino ainda não está conectado.' }, 400)
-    const r = await enviar(token, [{ chat_id: d.chat_id, nome: d.nome, texto: '🔔 Teste do Abz Gestão: este chat vai receber os avisos do Checklist.' }])
+    const r = await enviar(token, [{ chat_id: d.chat_id, nome: d.nome, texto: '🔔 Teste do Abz Gestão: este chat vai receber os avisos do app.' }])
     return r.enviadas > 0 ? json({ ok: true }) : json({ error: r.falhas[0]?.motivo ?? 'Não foi possível enviar.' }, 400)
   }
 
@@ -180,6 +183,34 @@ Deno.serve(async (req) => {
     })
     const alvos = ((destinos ?? []) as Destino[]).filter((d) => d.setor === null || d.setor === t.setor)
     return json(await enviar(token, alvos.map((d) => ({ ...d, texto }))))
+  }
+
+  if ((tipo === 'requisicao' && doBanco) || tipo === 'requisicoes_abertas') {
+    const consulta = admin.from('requisicoes').select('tipo, titulo, descricao, urgencia, status, solicitante_nome, setor, foto_path, created_at')
+    const { data, error } =
+      tipo === 'requisicao'
+        ? await consulta.eq('id', String(body.requisicao_id ?? ''))
+        : await consulta.in('status', ['pendente', 'aprovada'])
+    // Falha na leitura não pode virar um "nenhuma requisição em aberto".
+    if (error) return json({ error: 'Não foi possível ler as requisições.' }, 500)
+    const requisicoes = (data ?? []) as RequisicaoAviso[]
+    if (tipo === 'requisicao' && requisicoes.length === 0) return json({ ok: true, enviadas: 0 })
+
+    const { data: destinos } = await admin
+      .from('notificacao_destinos')
+      .select('id, nome, setor, chat_id')
+      .eq('ativo', true)
+      .eq('avisar_requisicoes', true)
+      .not('chat_id', 'is', null)
+
+    // Destino de um setor só recebe as do setor; "todos os setores" recebe tudo
+    // (inclusive as sem setor, abertas pela administração).
+    const mensagens = ((destinos ?? []) as Destino[]).flatMap((d) => {
+      const doDestino = requisicoes.filter((r) => d.setor === null || d.setor === r.setor)
+      if (tipo === 'requisicao') return doDestino.map((r) => ({ ...d, texto: mensagemNovaRequisicao(r) }))
+      return mensagensRequisicoesAbertas(doDestino).map((texto) => ({ ...d, texto }))
+    })
+    return json(await enviar(token, mensagens))
   }
 
   if (tipo === 'pendencias') {

@@ -38,7 +38,7 @@ export async function novoCodigoDestino(id: string): Promise<void> {
 
 export async function atualizarDestino(
   id: string,
-  patch: Partial<Pick<NotificacaoDestinoRow, 'nome' | 'setor' | 'avisar_conclusoes' | 'avisar_pendencias' | 'ativo'>>,
+  patch: Partial<Pick<NotificacaoDestinoRow, 'nome' | 'setor' | 'avisar_conclusoes' | 'avisar_pendencias' | 'avisar_requisicoes' | 'ativo'>>,
 ): Promise<void> {
   const { error } = await supabase.from('notificacao_destinos').update(patch).eq('id', id)
   if (error) throw error
@@ -79,3 +79,5 @@ export const ativarBot = () => chamarFuncao<{ ok: true }>({ tipo: 'configurar' }
 export const enviarTeste = (destinoId: string) => chamarFuncao<{ ok: true }>({ tipo: 'teste', destino_id: destinoId })
 export const enviarResumoAgora = () =>
   chamarFuncao<{ data: string; enviadas: number; falhas: { destino: string; motivo: string }[] }>({ tipo: 'pendencias' })
+export const enviarRequisicoesAgora = () =>
+  chamarFuncao<{ enviadas: number; falhas: { destino: string; motivo: string }[] }>({ tipo: 'requisicoes_abertas' })

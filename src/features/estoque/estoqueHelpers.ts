@@ -206,3 +206,53 @@ export function agruparPorSetor<T extends { categoria: EstoqueCategoria }>(items
     (g) => g.itens.length > 0,
   )
 }
+
+// ---- Unidades soltas de pacote/fardo/caixa ----
+// O saldo de um fardo é guardado em fardos (com 3 casas). Pra mexer em
+// unidades soltas (tirar 2 garrafas de um fardo de 12) o saldo é convertido
+// pra unidades INTEIRAS, mexe-se nelas e volta pra fardos. O saldo atual é
+// sempre reconstruído com round(saldo × unidades por embalagem): assim 0,083
+// fardo (1 de 12) volta a ser exatamente 1 unidade e nada se acumula.
+
+type ItemEmbalagem = Pick<EstoqueItemRow, 'quantidade' | 'unidade' | 'unidades_por_embalagem'>
+
+export function podeMexerEmUnidadesSoltas(item: Pick<EstoqueItemRow, 'unidade' | 'unidades_por_embalagem'>): boolean {
+  return ESTOQUE_UNIDADES_EMBALAGEM.includes(item.unidade) && Number(item.unidades_por_embalagem) > 0
+}
+
+export interface SaldoEmbalagemESoltas {
+  embalagens: number
+  soltas: number
+  totalUnidades: number
+}
+
+export function saldoEmbalagemESoltas(item: ItemEmbalagem): SaldoEmbalagemESoltas | null {
+  if (!podeMexerEmUnidadesSoltas(item)) return null
+  const upe = Number(item.unidades_por_embalagem)
+  const totalUnidades = Math.round(Number(item.quantidade) * upe)
+  return { embalagens: Math.floor(totalUnidades / upe), soltas: totalUnidades % upe, totalUnidades }
+}
+
+// Quanto (em embalagens, sempre positivo) corresponde a `soltas` unidades
+// somadas (sentido 1) ou tiradas (sentido -1) do saldo atual. Já sai pronto pra
+// registrar_entrada_estoque / registrar_saida_estoque. Retorna null se as
+// unidades não forem inteiras positivas ou se a retirada passar do saldo.
+export function embalagensPorUnidadesSoltas(item: ItemEmbalagem, soltas: number, sentido: 1 | -1): number | null {
+  const saldo = saldoEmbalagemESoltas(item)
+  if (!saldo || !Number.isInteger(soltas) || soltas <= 0) return null
+  const novoTotal = saldo.totalUnidades + sentido * soltas
+  if (novoTotal < 0) return null
+  const upe = Number(item.unidades_por_embalagem)
+  const delta = round3(Math.abs(round3(novoTotal / upe) - Number(item.quantidade)))
+  return delta > 0 ? delta : null
+}
+
+// "3 fardos e 4 un (40 unidades)"; sem fração, só "3 fardos (36 unidades)".
+export function rotuloSaldoEmbalagem(item: ItemEmbalagem): string | null {
+  const s = saldoEmbalagemESoltas(item)
+  if (!s) return null
+  const nome = item.unidade.toLowerCase()
+  const plural = s.embalagens === 1 ? nome : `${nome}s`
+  const base = s.soltas > 0 ? `${s.embalagens} ${plural} e ${s.soltas} un` : `${s.embalagens} ${plural}`
+  return `${base} (${s.totalUnidades} unidades)`
+}

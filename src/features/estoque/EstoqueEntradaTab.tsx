@@ -4,7 +4,8 @@ import { isFullAdmin, useAuthStore } from '../../store/authStore'
 import { isoDate } from '../../lib/date'
 import { supabase } from '../../lib/supabaseClient'
 import { visibleCategorias } from './estoqueAccess'
-import { ordenarPorTitulo } from './estoqueHelpers'
+import { embalagensPorUnidadesSoltas, ordenarPorTitulo, podeMexerEmUnidadesSoltas, rotuloSaldoEmbalagem } from './estoqueHelpers'
+import { ModoQuantidadeEmbalagem, type ModoQuantidade } from './ModoQuantidadeEmbalagem'
 import { ESTOQUE_ITENS_KEY, ESTOQUE_MOVIMENTOS_KEY, useEstoqueItens } from './useEstoque'
 import type { EstoqueCategoria } from '../../types/database'
 
@@ -30,6 +31,7 @@ export function EstoqueEntradaTab({ onIrParaCadastro }: { onIrParaCadastro?: () 
   const [setor, setSetor] = useState<EstoqueCategoria>(locked ?? setores[0] ?? 'Bar')
   const [produtoTexto, setProdutoTexto] = useState('')
   const [quantidade, setQuantidade] = useState('')
+  const [modo, setModo] = useState<ModoQuantidade>('embalagem')
   const [data, setData] = useState(isoDate(new Date()))
   const [observacao, setObservacao] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -44,7 +46,9 @@ export function EstoqueEntradaTab({ onIrParaCadastro }: { onIrParaCadastro?: () 
     [itensDoSetor, produtoTexto],
   )
 
-  const quantidadeNum = Number(quantidade)
+  // Fardo/pacote/caixa: dá pra somar em unidades soltas (convertidas em fração de embalagem).
+  const soltasAtivo = !!produtoSelecionado && podeMexerEmUnidadesSoltas(produtoSelecionado) && modo === 'soltas'
+  const quantidadeNum = soltasAtivo ? (embalagensPorUnidadesSoltas(produtoSelecionado, Number(quantidade), 1) ?? 0) : Number(quantidade)
   const isValid = !!setor && !!produtoSelecionado && quantidadeNum > 0 && !!data
 
   async function handleSubmit(e: FormEvent) {
@@ -65,7 +69,7 @@ export function EstoqueEntradaTab({ onIrParaCadastro }: { onIrParaCadastro?: () 
         p_quantidade: quantidadeNum,
         p_tipo: 'Entrada Manual',
         p_data_hora: dataHora,
-        p_observacao: observacao.trim() || null,
+        p_observacao: [observacao.trim(), soltasAtivo ? `+${quantidade} unidades soltas` : ''].filter(Boolean).join(' — ') || null,
       })
       if (rpcError) {
         setError(rpcError.message)
@@ -76,6 +80,7 @@ export function EstoqueEntradaTab({ onIrParaCadastro }: { onIrParaCadastro?: () 
       await queryClient.invalidateQueries({ queryKey: ESTOQUE_MOVIMENTOS_KEY })
       setProdutoTexto('')
       setQuantidade('')
+      setModo('embalagem')
       setObservacao('')
     } finally {
       setSubmitting(false)
@@ -125,7 +130,10 @@ export function EstoqueEntradaTab({ onIrParaCadastro }: { onIrParaCadastro?: () 
             <>
               <input
                 value={produtoTexto}
-                onChange={(e) => setProdutoTexto(e.target.value)}
+                onChange={(e) => {
+                  setProdutoTexto(e.target.value)
+                  setModo('embalagem')
+                }}
                 list="entrada-produto-list"
                 placeholder="Digite pra buscar..."
                 required
@@ -142,17 +150,26 @@ export function EstoqueEntradaTab({ onIrParaCadastro }: { onIrParaCadastro?: () 
           )}
         </div>
 
+        {produtoSelecionado && podeMexerEmUnidadesSoltas(produtoSelecionado) && (
+          <ModoQuantidadeEmbalagem item={produtoSelecionado} modo={modo} onChange={setModo} />
+        )}
         <div className="field-row">
           <div className="field">
-            <label>Quantidade *</label>
+            <label>{soltasAtivo ? 'Unidades soltas *' : 'Quantidade *'}</label>
             <input
               type="number"
-              min="0.001"
-              step="any"
+              min={soltasAtivo ? 1 : 0.001}
+              step={soltasAtivo ? 1 : 'any'}
               value={quantidade}
               onChange={(e) => setQuantidade(e.target.value)}
               required
             />
+            {produtoSelecionado && rotuloSaldoEmbalagem(produtoSelecionado) && (
+              <span className="field-hint">
+                Saldo atual: {rotuloSaldoEmbalagem(produtoSelecionado)}
+                {soltasAtivo && Number(quantidade) > 0 && quantidadeNum === 0 ? ' · informe unidades inteiras' : ''}
+              </span>
+            )}
           </div>
           <div className="field">
             <label>Data de entrada *</label>

@@ -5,7 +5,11 @@ import {
   estoqueQuantidadeLabel,
   formatValidadeRotulo,
   ordenarPorTitulo,
+  embalagensPorUnidadesSoltas,
+  podeMexerEmUnidadesSoltas,
   precisaComprar,
+  rotuloSaldoEmbalagem,
+  saldoEmbalagemESoltas,
   subcategoriasDaCategoria,
   sugestaoCompra,
   validadeInfo,
@@ -157,5 +161,52 @@ describe('subcategoriasDaCategoria', () => {
 
   it('categoria sem subcategorias vinculadas devolve lista vazia', () => {
     expect(subcategoriasDaCategoria(dados, 'Bar', 'Frutas')).toEqual([])
+  })
+})
+
+describe('unidades soltas de pacote/fardo', () => {
+  const fardo = (quantidade: number, upe: number | null = 12) => ({ quantidade, unidade: 'Fardo' as const, unidades_por_embalagem: upe })
+
+  it('só vale pra embalagem com unidades por embalagem configurada', () => {
+    expect(podeMexerEmUnidadesSoltas(fardo(2))).toBe(true)
+    expect(podeMexerEmUnidadesSoltas(fardo(2, null))).toBe(false)
+    expect(podeMexerEmUnidadesSoltas({ unidade: 'Litro', unidades_por_embalagem: 12 })).toBe(false)
+  })
+
+  it('saldo em embalagens + soltas, reconstruído sem erro de arredondamento', () => {
+    expect(saldoEmbalagemESoltas(fardo(3.333))).toEqual({ embalagens: 3, soltas: 4, totalUnidades: 40 }) // 3,333 × 12 = 39,996 -> 40
+    expect(saldoEmbalagemESoltas(fardo(0.083))).toEqual({ embalagens: 0, soltas: 1, totalUnidades: 1 })
+    expect(saldoEmbalagemESoltas({ quantidade: 1, unidade: 'Unidade', unidades_por_embalagem: null })).toBeNull()
+  })
+
+  it('tirar unidades soltas: 2 de 3 fardos de 12', () => {
+    const delta = embalagensPorUnidadesSoltas(fardo(3), 2, -1)
+    expect(delta).toBe(0.167)
+    expect(3 - (delta as number)).toBe(2.833) // 34 unidades de 36
+  })
+
+  it('12 retiradas de 1 unidade não deixam resto (sem deriva)', () => {
+    let q = 3
+    for (let i = 0; i < 12; i++) q = Math.round((q - (embalagensPorUnidadesSoltas(fardo(q), 1, -1) as number)) * 1000) / 1000
+    expect(q).toBe(2) // exatamente 24 unidades
+    expect(saldoEmbalagemESoltas(fardo(q))?.totalUnidades).toBe(24)
+  })
+
+  it('somar unidades soltas', () => {
+    expect(embalagensPorUnidadesSoltas(fardo(2), 5, 1)).toBe(0.417) // 24 + 5 = 29 -> 2,417
+    expect(embalagensPorUnidadesSoltas(fardo(2), 12, 1)).toBe(1)
+  })
+
+  it('recusa unidade quebrada, zero e retirada maior que o saldo', () => {
+    expect(embalagensPorUnidadesSoltas(fardo(2), 1.5, 1)).toBeNull()
+    expect(embalagensPorUnidadesSoltas(fardo(2), 0, 1)).toBeNull()
+    expect(embalagensPorUnidadesSoltas(fardo(2), 25, -1)).toBeNull() // só há 24
+    expect(embalagensPorUnidadesSoltas(fardo(2), 24, -1)).toBe(2)
+  })
+
+  it('rótulo do saldo', () => {
+    expect(rotuloSaldoEmbalagem(fardo(3.333))).toBe('3 fardos e 4 un (40 unidades)')
+    expect(rotuloSaldoEmbalagem(fardo(1))).toBe('1 fardo (12 unidades)')
+    expect(rotuloSaldoEmbalagem(fardo(1, null))).toBeNull()
   })
 })

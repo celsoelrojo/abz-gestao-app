@@ -12,7 +12,12 @@ import {
   estoqueQuantidadeLabel,
   filtrarPorCategoria,
   ordenarPorTitulo,
+  podeMexerEmUnidadesSoltas,
+  embalagensPorUnidadesSoltas,
+  rotuloSaldoEmbalagem,
+  saldoEmbalagemESoltas,
 } from './estoqueHelpers'
+import { ModoQuantidadeEmbalagem, type ModoQuantidade } from './ModoQuantidadeEmbalagem'
 import { CategoriaFiltroSelect } from './CategoriaFiltroSelect'
 import { ESTOQUE_ITENS_KEY, ESTOQUE_MOVIMENTOS_KEY, useEstoqueItens, useEstoqueMovimentos } from './useEstoque'
 import { EstoqueItemList } from './EstoqueItemList'
@@ -30,6 +35,7 @@ export function EstoqueRetiradaTab() {
   const [busca, setBusca] = useState('')
   const [itemId, setItemId] = useState('')
   const [quantidade, setQuantidade] = useState('')
+  const [modo, setModo] = useState<ModoQuantidade>('embalagem')
   const [motivo, setMotivo] = useState<MotivoRetirada>('Uso interno')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -56,9 +62,12 @@ export function EstoqueRetiradaTab() {
   }, [itensFiltrados])
 
   const item = itensDoSetor.find((it) => it.id === itemId)
-  const quantidadeNum = Number(quantidade)
+  // Fardo/pacote/caixa: dá pra tirar unidades soltas (convertidas em fração de embalagem).
+  const soltasAtivo = !!item && podeMexerEmUnidadesSoltas(item) && modo === 'soltas'
+  const soltasNum = Number(quantidade)
+  const quantidadeNum = soltasAtivo ? (embalagensPorUnidadesSoltas(item, soltasNum, -1) ?? 0) : soltasNum
   const saldoPrevisto = (item?.quantidade ?? 0) - (quantidadeNum || 0)
-  const excedeSaldo = !!item && saldoPrevisto < 0
+  const excedeSaldo = soltasAtivo ? soltasNum > (saldoEmbalagemESoltas(item)?.totalUnidades ?? 0) : !!item && saldoPrevisto < 0
   const isValid = !!item && quantidadeNum > 0 && !!motivo && !excedeSaldo
 
   const historico = useMemo(
@@ -101,6 +110,7 @@ export function EstoqueRetiradaTab() {
       await refetch()
       setItemId('')
       setQuantidade('')
+      setModo('embalagem')
     } finally {
       setSubmitting(false)
     }
@@ -168,7 +178,14 @@ export function EstoqueRetiradaTab() {
       <form className="modal-body" onSubmit={handleSubmit} style={{ maxWidth: 520, marginBottom: 28 }}>
         <div className="field">
           <label>Produto *</label>
-          <select value={itemId} onChange={(e) => setItemId(e.target.value)} required>
+          <select
+            value={itemId}
+            onChange={(e) => {
+              setItemId(e.target.value)
+              setModo('embalagem')
+            }}
+            required
+          >
             <option value="">Selecione...</option>
             {produtoGrupos.map((g) => (
               <optgroup label={g.chave} key={g.chave}>
@@ -181,14 +198,24 @@ export function EstoqueRetiradaTab() {
             ))}
           </select>
         </div>
+        {item && podeMexerEmUnidadesSoltas(item) && <ModoQuantidadeEmbalagem item={item} modo={modo} onChange={setModo} />}
         <div className="field">
-          <label>Quantidade retirada * {item ? `(${item.unidade})` : ''}</label>
-          <input type="number" min="0.001" step="any" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required />
+          <label>{soltasAtivo ? 'Unidades soltas retiradas *' : `Quantidade retirada * ${item ? `(${item.unidade})` : ''}`}</label>
+          <input
+            type="number"
+            min={soltasAtivo ? 1 : 0.001}
+            step={soltasAtivo ? 1 : 'any'}
+            value={quantidade}
+            onChange={(e) => setQuantidade(e.target.value)}
+            required
+          />
           {item && quantidade && (
             <span className="field-hint" style={excedeSaldo ? { color: 'var(--danger)', fontWeight: 700 } : undefined}>
               {excedeSaldo
                 ? 'Excede o saldo disponível.'
-                : `Saldo atual: ${estoqueQuantidadeLabel(item.quantidade, item.unidade)} · Saldo previsto após a retirada: ${estoqueQuantidadeLabel(saldoPrevisto, item.unidade)}`}
+                : soltasAtivo && quantidadeNum === 0
+                  ? 'Informe unidades inteiras.'
+                  : `Saldo atual: ${rotuloSaldoEmbalagem(item) ?? estoqueQuantidadeLabel(item.quantidade, item.unidade)} · Saldo previsto após a retirada: ${rotuloSaldoEmbalagem({ ...item, quantidade: saldoPrevisto }) ?? estoqueQuantidadeLabel(saldoPrevisto, item.unidade)}`}
             </span>
           )}
         </div>

@@ -35,7 +35,8 @@ export function EstoqueRetiradaTab() {
   const [busca, setBusca] = useState('')
   const [itemId, setItemId] = useState('')
   const [quantidade, setQuantidade] = useState('')
-  const [modo, setModo] = useState<ModoQuantidade>('embalagem')
+  // Na retirada a prioridade é tirar unidade solta; fardo/pacote inteiro é a exceção.
+  const [modo, setModo] = useState<ModoQuantidade>('soltas')
   const [motivo, setMotivo] = useState<MotivoRetirada>('Uso interno')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -110,7 +111,7 @@ export function EstoqueRetiradaTab() {
       await refetch()
       setItemId('')
       setQuantidade('')
-      setModo('embalagem')
+      setModo('soltas')
     } finally {
       setSubmitting(false)
     }
@@ -182,7 +183,7 @@ export function EstoqueRetiradaTab() {
             value={itemId}
             onChange={(e) => {
               setItemId(e.target.value)
-              setModo('embalagem')
+              setModo('soltas')
             }}
             required
           >

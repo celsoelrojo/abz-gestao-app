@@ -315,3 +315,16 @@ export async function ajustarQuantidadeEstoque(itemId: string, novaQuantidade: n
 // quando Entrada passou a exigir produto já cadastrado (ver
 // EstoqueCadastrarProdutoTab/criarProdutoEstoque acima) — pedido do usuário
 // pra centralizar o cadastro num único lugar.
+
+// Liga/desliga o produto que recebe a entrada de uma ficha de produção (campo
+// no formulário da ficha). Produto ligado a ficha é sempre Remanufaturado —
+// senão a edição do cadastro apagaria o vínculo.
+export async function definirFichaDoProduto(itemId: string, fichaProducaoId: string | null): Promise<void> {
+  const { data, error } = await supabase
+    .from('estoque_itens')
+    .update(fichaProducaoId ? { ficha_producao_id: fichaProducaoId, tipo_produto: 'Remanufaturado' } : { ficha_producao_id: null })
+    .eq('id', itemId)
+    .select('id')
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error('Sem permissão para alterar este produto do estoque.')
+}

@@ -6,7 +6,24 @@ import { isoDate } from '../../lib/date'
 import { useVinculoOptions, VINCULO_TIPOS, type VinculoTipo } from '../../lib/vinculo'
 import { confirmar } from '../../store/confirmStore'
 import { TaxonomiaField } from '../estoque/TaxonomiaField'
-import { TAXONOMIAS_KEY, registrarTaxonomia, taxonomiaValores, useEstoqueItens, useTaxonomias } from '../estoque/useEstoque'
+import {
+  ESTOQUE_ITENS_KEY,
+  TAXONOMIAS_KEY,
+  criarProdutoEstoque,
+  definirFichaDoProduto,
+  registrarTaxonomia,
+  taxonomiaValores,
+  useEstoqueItens,
+  useTaxonomias,
+} from '../estoque/useEstoque'
+import { VinculoEstoqueField } from './VinculoEstoqueField'
+import {
+  CONDICAO_ESTOQUE_DA_FICHA,
+  CRIAR_PRODUTO,
+  motivoProdutoIncompativel,
+  mudancasDeVinculo,
+  unidadeEstoqueDoRendimento,
+} from './vinculoEstoque'
 import { FICHA_PRODUCAO_CATEGORIAS, FICHA_SETORES, PRODUCAO_CONDICOES_ARMAZENAMENTO, PRODUCAO_UNIDADES_RENDIMENTO } from './fichaConstants'
 import { calcProducaoFichaCustoTotal, calcProducaoIngredienteCustoTotal, opcoesDeCategoria } from './fichaHelpers'
 import { deleteFichaImagem, fichaImagemUrl, uploadFichaImagem } from './fichaStorage'
@@ -81,6 +98,9 @@ export function FichaProducaoFormModal({
   const [vinculoTipo, setVinculoTipo] = useState<VinculoTipo | ''>('')
   const [vinculoId, setVinculoId] = useState('')
 
+  // Produto do estoque que recebe a produção. null = ninguém mexeu no campo.
+  const [produtoEscolhido, setProdutoEscolhido] = useState<string | null>(null)
+
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<'rascunho' | 'publicada' | null>(null)
 
@@ -108,6 +128,7 @@ export function FichaProducaoFormModal({
   function handleSetorChange(next: 'Bar' | 'Cozinha') {
     setSetor(next)
     setCategoriasNovas([])
+    setProdutoEscolhido('')
     if (!FICHA_PRODUCAO_CATEGORIAS.includes(categoria)) setCategoria('')
   }
 
@@ -125,6 +146,68 @@ export function FichaProducaoFormModal({
     } catch {
       setError('A categoria vale para esta ficha, mas não foi possível guardá-la na lista.')
     }
+  }
+
+  const produtoLigado = ficha ? estoqueItensDoSetor.find((it) => it.ficha_producao_id === ficha.id) : undefined
+  const produtoId = produtoEscolhido ?? produtoLigado?.id ?? ''
+  const itemEscolhido = estoqueItensDoSetor.find((it) => it.id === produtoId)
+  const motivo = itemEscolhido ? motivoProdutoIncompativel(itemEscolhido, ficha?.id ?? null, unidadeRendimento) : null
+  const problemaVinculo =
+    produtoId === CRIAR_PRODUTO
+      ? !unidadeRendimento || !condicaoArmazenamento
+        ? 'Para criar o produto, preencha a unidade do rendimento e a condição de armazenamento.'
+        : null
+      : itemEscolhido && !unidadeRendimento
+        ? 'Escolha a unidade do rendimento.'
+        : motivo
+          ? `Este produto não pode receber a produção: ${motivo}.`
+          : null
+
+  // Roda depois de a ficha estar salva (a ficha nova só aí tem id).
+  async function salvarVinculoEstoque(fichaId: string) {
+    let escolhido = produtoId
+    if (escolhido === CRIAR_PRODUTO) {
+      const unidade = unidadeEstoqueDoRendimento(unidadeRendimento)
+      if (!unidade || !condicaoArmazenamento) throw new Error('Faltam a unidade do rendimento e a condição de armazenamento.')
+      const criado = await criarProdutoEstoque({
+        categoria: setor,
+        title: nome,
+        tipoProduto: 'Remanufaturado',
+        marca: null,
+        produtoCategoria: null,
+        subcategoria: null,
+        unidade,
+        volumePadrao: null,
+        volumePadraoUnidade: null,
+        unidadesPorEmbalagem: null,
+        condicaoArmazenamento: CONDICAO_ESTOQUE_DA_FICHA[condicaoArmazenamento],
+        prazoValidade: prazoValidade === '' ? null : Number(prazoValidade),
+        unidadeValidade: prazoValidade === '' ? null : 'Dias',
+        fichaProducaoId: fichaId,
+      })
+      escolhido = criado.id
+    }
+    // Lista completa (não só do setor): trocar a ficha de setor solta o produto antigo.
+    const { desligar, ligar } = mudancasDeVinculo(estoqueItens ?? [], fichaId, escolhido)
+    for (const id of desligar) await definirFichaDoProduto(id, null)
+    // O produto recém-criado já nasce ligado.
+    if (ligar && produtoId !== CRIAR_PRODUTO) await definirFichaDoProduto(ligar, fichaId)
+  }
+
+  // A ficha já foi salva: se o vínculo falhar, fecha mesmo assim (salvar de
+  // novo criaria uma ficha repetida) e avisa como resolver.
+  async function concluirSalvamento(fichaId: string) {
+    if (produtoEscolhido !== null) {
+      try {
+        await salvarVinculoEstoque(fichaId)
+      } catch (err) {
+        window.alert(
+          `A ficha foi salva, mas o vínculo com o estoque falhou: ${err instanceof Error ? err.message : 'erro desconhecido'} Abra a ficha em Editar para tentar de novo.`,
+        )
+      }
+      await queryClient.invalidateQueries({ queryKey: ESTOQUE_ITENS_KEY })
+    }
+    await onSaved()
   }
 
   function updateIngrediente(id: string, patch: Partial<ProducaoIngrediente>) {
@@ -197,6 +280,10 @@ export function FichaProducaoFormModal({
   async function handleSave(target: 'rascunho' | 'publicada', e: FormEvent) {
     e.preventDefault()
     if (!isValid) return
+    if (problemaVinculo) {
+      setError(problemaVinculo)
+      return
+    }
     setError(null)
     setSubmitting(target)
     try {
@@ -237,21 +324,26 @@ export function FichaProducaoFormModal({
           setError(updateError.message)
           return
         }
+        await concluirSalvamento(ficha.id)
       } else {
         const historico =
           target === 'publicada' ? [historicoEntry, { ...historicoEntry, tipo: 'publicacao' as const }] : [historicoEntry]
-        const { error: insertError } = await supabase.from('fichas_producao').insert({
-          ...payload,
-          historico,
-          criado_por: profile?.nome ?? null,
-          criado_em: now,
-        })
+        const { data: criada, error: insertError } = await supabase
+          .from('fichas_producao')
+          .insert({
+            ...payload,
+            historico,
+            criado_por: profile?.nome ?? null,
+            criado_em: now,
+          })
+          .select('id')
+          .single()
         if (insertError) {
           setError(insertError.message)
           return
         }
+        await concluirSalvamento(criada.id)
       }
-      await onSaved()
     } finally {
       setSubmitting(null)
     }
@@ -441,6 +533,17 @@ export function FichaProducaoFormModal({
               </select>
             </div>
           </div>
+
+          <h4 className="section-label">Entrada no Estoque</h4>
+          <VinculoEstoqueField
+            itensDoSetor={estoqueItensDoSetor}
+            fichaId={ficha?.id ?? null}
+            nomeFicha={nome}
+            rendimento={unidadeRendimento}
+            valor={produtoId}
+            onChange={setProdutoEscolhido}
+            problema={problemaVinculo}
+          />
 
           <h4 className="section-label">Informações complementares</h4>
           <div className="field-row">

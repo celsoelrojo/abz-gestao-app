@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { isFullAdmin, useAuthStore } from '../../store/authStore'
 import { confirmar } from '../../store/confirmStore'
 import { supabase } from '../../lib/supabaseClient'
+import { useEstoqueItens } from '../estoque/useEstoque'
 import { FICHA_SETORES } from './fichaConstants'
 import { FICHAS_PRODUCAO_KEY, useFichasProducao } from './useFichasProducao'
 import { FichaProducaoFormModal } from './FichaProducaoFormModal'
@@ -18,6 +19,8 @@ export function FichasProducaoGerenciarTab() {
   const admin = isFullAdmin(profile)
 
   const { data, isLoading } = useFichasProducao()
+  const { data: estoqueItens } = useEstoqueItens()
+  const produtoDaFicha = (id: string) => estoqueItens?.find((it) => it.ficha_producao_id === id)
 
   const profileSetor = profile?.setor
   const visibleSetores: Setor[] = useMemo(
@@ -93,6 +96,8 @@ export function FichasProducaoGerenciarTab() {
                     <strong>{f.nome}</strong>
                     <span>
                       {f.categoria ?? '—'} · versão {f.versao}
+                      {estoqueItens &&
+                        (produtoDaFicha(f.id) ? ` · Entra no estoque em: ${produtoDaFicha(f.id)!.title}` : ' · ⚠️ Sem produto no estoque')}
                     </span>
                     <div className="account-badges">
                       <span

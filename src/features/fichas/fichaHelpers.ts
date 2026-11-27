@@ -111,3 +111,16 @@ export function gerarNumeroLote(nome: string, codigo: string | null, dataProduca
   const mm = String(dataProducao.getMonth() + 1).padStart(2, '0')
   return `${prefixo}-${dd}${mm}-${String(sequencial).padStart(3, '0')}`
 }
+
+// Opções de "Categoria" de uma ficha: as padrão e depois as criadas pela equipe
+// (ordem alfabética), sem repetir o mesmo nome com maiúsculas diferentes.
+export function opcoesDeCategoria(padrao: string[], criadas: string[]): string[] {
+  const vistas = new Set<string>()
+  const extras = [...criadas].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  return [...padrao, ...extras].filter((c) => {
+    const chave = c.trim().toLocaleLowerCase('pt-BR')
+    if (!chave || vistas.has(chave)) return false
+    vistas.add(chave)
+    return true
+  })
+}

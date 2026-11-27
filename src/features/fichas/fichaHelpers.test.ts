@@ -8,6 +8,7 @@ import {
   calcValidadeDateTime,
   calcularProducaoEscalada,
   gerarNumeroLote,
+  opcoesDeCategoria,
 } from './fichaHelpers'
 
 describe('calcIngredienteCustoUnitario', () => {
@@ -113,5 +114,11 @@ describe('gerarNumeroLote', () => {
 
   it('cai pras 3 primeiras letras do nome quando não há código', () => {
     expect(gerarNumeroLote('Xarope de Gengibre', null, new Date(2026, 7, 17), 3)).toBe('XAR-1708-003')
+  })
+})
+
+describe('opcoesDeCategoria', () => {
+  it('mantém as padrão na ordem e põe as criadas depois, sem repetir', () => {
+    expect(opcoesDeCategoria(['Base', 'Molho'], ['Infusão', 'molho', 'Espuma', 'Infusão', '  '])).toEqual(['Base', 'Molho', 'Espuma', 'Infusão'])
   })
 })

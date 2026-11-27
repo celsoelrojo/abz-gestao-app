@@ -1,12 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabaseClient'
 import { isoDate } from '../../lib/date'
 import { useVinculoOptions, VINCULO_TIPOS, type VinculoTipo } from '../../lib/vinculo'
 import { confirmar } from '../../store/confirmStore'
-import { useEstoqueItens } from '../estoque/useEstoque'
+import { TaxonomiaField } from '../estoque/TaxonomiaField'
+import { TAXONOMIAS_KEY, registrarTaxonomia, taxonomiaValores, useEstoqueItens, useTaxonomias } from '../estoque/useEstoque'
 import { FICHA_PRODUCAO_CATEGORIAS, FICHA_SETORES, PRODUCAO_CONDICOES_ARMAZENAMENTO, PRODUCAO_UNIDADES_RENDIMENTO } from './fichaConstants'
-import { calcProducaoFichaCustoTotal, calcProducaoIngredienteCustoTotal } from './fichaHelpers'
+import { calcProducaoFichaCustoTotal, calcProducaoIngredienteCustoTotal, opcoesDeCategoria } from './fichaHelpers'
 import { deleteFichaImagem, fichaImagemUrl, uploadFichaImagem } from './fichaStorage'
 import type {
   FichaProducaoRow,
@@ -52,6 +54,7 @@ export function FichaProducaoFormModal({
   const [nome, setNome] = useState(ficha?.nome ?? '')
   const [setor, setSetor] = useState<'Bar' | 'Cozinha'>((ficha?.setor as 'Bar' | 'Cozinha') ?? lockedSetor ?? defaultSetor)
   const [categoria, setCategoria] = useState(ficha?.categoria ?? '')
+  const [categoriasNovas, setCategoriasNovas] = useState<string[]>([])
   const [fotoPrincipalUrl, setFotoPrincipalUrl] = useState(ficha?.foto_principal_url ?? null)
   const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string | null>(null)
   const [uploadingFoto, setUploadingFoto] = useState(false)
@@ -86,6 +89,43 @@ export function FichaProducaoFormModal({
   const vinculoOptions = useVinculoOptions(vinculoTipo || null, setor, ficha?.id)
 
   const custoTotalReceita = useMemo(() => calcProducaoFichaCustoTotal(ingredientes), [ingredientes])
+
+  // Categorias: as padrão + as criadas pela equipe pro setor (mesma tabela de
+  // sugestões do Estoque). A categoria já gravada na ficha nunca some da lista.
+  const queryClient = useQueryClient()
+  const { data: taxonomias } = useTaxonomias('ficha_producao')
+  const categoriaOptions = useMemo(
+    () =>
+      opcoesDeCategoria(FICHA_PRODUCAO_CATEGORIAS, [
+        ...taxonomiaValores(taxonomias ?? [], setor, 'categoria'),
+        ...categoriasNovas,
+        ...(categoria ? [categoria] : []),
+      ]),
+    [taxonomias, setor, categoriasNovas, categoria],
+  )
+
+  // Cada setor tem as próprias categorias: ao trocar, só uma padrão continua escolhida.
+  function handleSetorChange(next: 'Bar' | 'Cozinha') {
+    setSetor(next)
+    setCategoriasNovas([])
+    if (!FICHA_PRODUCAO_CATEGORIAS.includes(categoria)) setCategoria('')
+  }
+
+  async function handleAddCategoria(valor: string) {
+    const existente = categoriaOptions.find((c) => c.toLocaleLowerCase('pt-BR') === valor.toLocaleLowerCase('pt-BR'))
+    if (existente) {
+      setCategoria(existente)
+      return
+    }
+    setCategoriasNovas((p) => [...p, valor])
+    setCategoria(valor)
+    try {
+      await registrarTaxonomia('ficha_producao', setor, valor, '')
+      await queryClient.invalidateQueries({ queryKey: TAXONOMIAS_KEY('ficha_producao') })
+    } catch {
+      setError('A categoria vale para esta ficha, mas não foi possível guardá-la na lista.')
+    }
+  }
 
   function updateIngrediente(id: string, patch: Partial<ProducaoIngrediente>) {
     setIngredientes((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
@@ -235,7 +275,7 @@ export function FichaProducaoFormModal({
             </div>
             <div className="field">
               <label>Setor *</label>
-              <select value={setor} onChange={(e) => setSetor(e.target.value as 'Bar' | 'Cozinha')} disabled={!!lockedSetor}>
+              <select value={setor} onChange={(e) => handleSetorChange(e.target.value as 'Bar' | 'Cozinha')} disabled={!!lockedSetor}>
                 {FICHA_SETORES.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -243,17 +283,15 @@ export function FichaProducaoFormModal({
                 ))}
               </select>
             </div>
-            <div className="field">
-              <label>Categoria</label>
-              <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-                <option value="">Selecione...</option>
-                {FICHA_PRODUCAO_CATEGORIAS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <TaxonomiaField
+              label="Categoria"
+              valor={categoria}
+              onChange={setCategoria}
+              opcoes={categoriaOptions}
+              onAdd={handleAddCategoria}
+              addTitle="Adicionar categoria"
+              placeholder="Nova categoria"
+            />
           </div>
           <div className="field">
             <label>Foto principal</label>
